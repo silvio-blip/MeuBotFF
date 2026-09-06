@@ -23,7 +23,7 @@ python main.py
 | Variável | Descrição |
 |---|---|
 | `DISCORD_TOKEN` | Token do bot Discord |
-| `API_VERCEL_URL` | URL da API Vercel para dados FF |
+| `API_VERCEL_URL` | URL base da API FF (ex: `https://ff-id-old.vercel.app/`) |
 | `API_VERCEL_KEY` | Chave de API da Vercel |
 | `SUPABASE_URL` | URL do projeto Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave service role do Supabase |
@@ -49,11 +49,13 @@ python main.py
 | `/desvincular` | Remove o teu registo e cargo | Qualquer membro verificado |
 
 **Como funciona o `/entrar`:**
-1. Entras o teu UID do Free Fire
-2. O bot verifica se pertences à guilda registada
-3. Mudas o idioma da assinatura no jogo (o bot deteta)
-4. Recebes o cargo automaticamente
-5. Tens 5 minutos para completar
+1. Selecionas o teu gênero
+2. Insere a tua idade
+3. Entras o teu UID do Free Fire
+4. O bot verifica se pertences à guilda registada
+5. Mudas o idioma da assinatura no jogo (o bot deteta)
+6. Recebes o cargo automaticamente
+7. Tens 5 minutos para completar
 
 ---
 
@@ -64,7 +66,7 @@ python main.py
 | `/perfil` | Mostra o teu perfil completo | Membro verificado |
 | `/perfil @membro` | Mostra o perfil de outro membro | Membro verificado |
 
-**Dados mostrados:** Nick FF, UID, Guilda, Nível, Likes, Patente BR, Clash Squad, Veterano, Data de criação.
+**Dados mostrados:** Nick FF, UID, Guilda, Nível, Likes, Patente BR, Clash Squad, Veterano, Avatar do FF, Perfil Discord (Avatar, Criação da Conta, Entrada no Servidor, Cargo Principal, Gênero, Idade), Data de criação.
 
 ---
 
@@ -191,6 +193,16 @@ Quando deteta raid, bloqueia o servidor temporariamente e expulsa novos membros.
 
 ---
 
+### Dados Pessoais
+
+Durante o `/entrar`, o bot pede:
+- **Gênero** (select: Masculino, Feminino, Outro, Prefiro não dizer)
+- **Idade** (número)
+
+Esses dados são salvos no perfil do usuário e exibidos no `/perfil`.
+
+---
+
 ## Painel de Controlo (`/painel`)
 
 O painel é um menu interativo com botões para configurar tudo:
@@ -218,6 +230,8 @@ MeuBotFF/
 ├── database_tables.sql  # Schema SQL
 ├── capa do bot.png      # Logo do bot
 ├── .env.example         # Template de variáveis
+├── scripts/
+│   └── add_genero_idade.sql  # SQL para adicionar colunas de gênero/idade
 └── cogs/
     ├── admin.py         # Configurar, Painel
     ├── usuarios.py      # Entrar, Desvincular, Perfil
