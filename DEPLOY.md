@@ -104,7 +104,7 @@ No `nano`, preenche os teus tokens:
 
 ```
 DISCORD_TOKEN=O_TEU_TOKEN_AQUI
-API_VERCEL_URL=https://fire-id.vercel.app/api/player
+API_VERCEL_URL=https://ff-id-old.vercel.app/
 API_VERCEL_KEY=A_TUA_CHAVE_AQUI
 SUPABASE_URL=A_TUA_URL_SUPABASE
 SUPABASE_SERVICE_ROLE_KEY=A_TUA_CHAVE_SUPABASE

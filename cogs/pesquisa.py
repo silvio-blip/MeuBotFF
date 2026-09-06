@@ -63,7 +63,7 @@ class Pesquisa(commands.Cog):
             tipo = "uid"
         else:
             # Buscar por nome
-            url_search = f"https://fire-id.vercel.app/api/search?name={busca}"
+            url_search = f"{config.API_VERCEL_URL}/api/search?name={busca}"
             resultados = await fetch_api(session, url_search, headers)
             
             if resultados and len(resultados) > 0:
@@ -71,7 +71,7 @@ class Pesquisa(commands.Cog):
                 primeiro = resultados[0]
                 uid = primeiro.get("uid") or primeiro.get("accountId")
                 if uid:
-                    url = f"{config.API_VERCEL_URL}?uid={uid}"
+                    url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
                     dados = await fetch_api(session, url, headers)
                     tipo = "nome"
         
