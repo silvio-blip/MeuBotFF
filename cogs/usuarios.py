@@ -234,7 +234,7 @@ async def processar_radar(interaction: discord.Interaction, user: discord.Member
                 if db_user_check.data and db_user_check.data[0].get("log_message_id"):
                     old_log_id = db_user_check.data[0]["log_message_id"]
 
-                    thumbnail_id = head_pic_id or avatar_id
+                    thumbnail_id = avatar_id or head_pic_id
                 
                 embed_perfil = discord.Embed(
                     title="🚨 Registo S.art | Perfil Verificado",
@@ -464,7 +464,7 @@ class Usuarios(commands.Cog):
         except Exception:
             pass
 
-        thumbnail_id = head_pic_id or avatar_id
+        thumbnail_id = avatar_id or head_pic_id
 
         embed_perfil = discord.Embed(
             title="🚨 Registo S.art | Perfil Verificado",
