@@ -58,7 +58,7 @@ class Pesquisa(commands.Cog):
         # Se é número → buscar por UID
         if busca.strip().isdigit():
             uid = busca.strip()
-            url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
+            url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
             dados = await fetch_api(session, url, headers)
             tipo = "uid"
         else:

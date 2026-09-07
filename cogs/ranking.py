@@ -191,7 +191,7 @@ class Ranking(commands.Cog):
         session = self.bot.session
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
         
-        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
+        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
         dados = await fetch_api_com_retry(session, url, headers)
         
         if not dados:
