@@ -104,23 +104,36 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
         url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
         
+        log_sart(f"🔎 /entrar - UID digitado: {uid}")
+        log_sart(f"🔎 /entrar - URL API: {url}")
+        log_sart(f"🔎 /entrar - Guilda configurada: {guilda_oficial}")
+        
         session = self.bot.session
         try:
             async with session.get(url, headers=headers) as resposta_api:
+                log_sart(f"🔎 /entrar - Status da API: {resposta_api.status}")
                 if resposta_api.status != 200:
                     return await interaction.followup.send("⚠️ Erro de conexão com a API da Vercel.")
                     
                 dados_iniciais = await resposta_api.json()
                 clan_id_raw = dados_iniciais.get("clanInfo", {}).get("clanId")
+                basic_info_raw = dados_iniciais.get("basicInfo", {})
+                nickname = basic_info_raw.get("nickname", "Desconhecido")
+                log_sart(f"🔎 /entrar - Nickname API: {nickname}")
+                log_sart(f"🔎 /entrar - clanInfo completo: {dados_iniciais.get('clanInfo')}")
+                log_sart(f"🔎 /entrar - clanId extraído: {clan_id_raw}")
+                
                 if not clan_id_raw:
-                    log_sart(f"⚠️ clanInfo null para UID {uid}: {dados_iniciais}")
+                    log_sart(f"❌ /entrar - BLOQUEADO: clanInfo é null/vazio para {nickname}")
                     return await interaction.followup.send("❌ **Acesso Negado:** Esta conta não está associada a nenhuma guilda no Free Fire.", ephemeral=True)
                 clan_id = str(clan_id_raw)
-                jogador_nome = dados_iniciais.get("basicInfo", {}).get("nickname", "Desconhecido")
-                log_sart(f"🔎 Verificação guilda para {jogador_nome}: API={clan_id}, Config={guilda_oficial}, Match={clan_id == guilda_oficial}")
+                log_sart(f"🔎 /entrar - Comparação: API={clan_id} vs Config={guilda_oficial} | Igual={clan_id == guilda_oficial}")
                 
                 if clan_id != guilda_oficial:
-                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{jogador_nome}` está na guilda `{clan_id}`, mas este servidor exige a guilda `{guilda_oficial}`.", ephemeral=True)
+                    log_sart(f"❌ /entrar - BLOQUEADO: guilda diferente para {nickname}")
+                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{nickname}` está na guilda `{clan_id}`, mas este servidor exige a guilda `{guilda_oficial}`.", ephemeral=True)
+                
+                log_sart(f"✅ /entrar - GUILDA OK para {nickname}: {clan_id} == {guilda_oficial}")
 
                 dados_pessoais = {
                     "genero": self.genero,

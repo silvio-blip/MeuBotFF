@@ -673,11 +673,14 @@ async def verificacao_automatica_loop(bot):
                                 clan_info = player_data.get("clanInfo") or {}
                                 clan_id = str(clan_info.get("clanId", ""))
                                 member = guild.get_member(int(m["id_discord"]))
+                                nick = basic_info.get("nickname", "Desconhecido") if isinstance(dados, dict) else "Desconhecido"
+                                log_sart(f"🔎 Verificação automática - UID {uid} ({nick}): clanId={clan_id}, guilda_config={guilda_ff_id}")
                                 if clan_id and clan_id != guilda_ff_id:
                                     if member and cargo and cargo in member.roles:
                                         try:
                                             await member.remove_roles(cargo)
                                             removidos.append(member.display_name)
+                                            log_sart(f"❌ Verificação automática - REMOVIDO: {nick} (clan {clan_id})")
                                         except discord.Forbidden:
                                             pass
                                     supabase.table("membros_verificados").delete().eq("id_discord", str(m["id_discord"])).eq("id_servidor", guild_id).execute()
