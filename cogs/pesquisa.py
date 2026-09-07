@@ -58,7 +58,7 @@ class Pesquisa(commands.Cog):
         # Se é número → buscar por UID
         if busca.strip().isdigit():
             uid = busca.strip()
-            url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+            url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
             dados = await fetch_api(session, url, headers)
             tipo = "uid"
         else:
@@ -71,7 +71,7 @@ class Pesquisa(commands.Cog):
                 primeiro = resultados[0]
                 uid = primeiro.get("uid") or primeiro.get("accountId")
                 if uid:
-                    url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+                    url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
                     dados = await fetch_api(session, url, headers)
                     tipo = "nome"
         

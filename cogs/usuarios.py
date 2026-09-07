@@ -101,7 +101,7 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
         
         uid = self.id_ff.value.strip()
         guilda_oficial = str(self.dados_server["id_guilda_ff"])
-        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+        url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
         
         log_sart(f"🔎 /entrar - UID digitado: {uid}")
@@ -191,7 +191,7 @@ class ModalConfirmacao(discord.ui.Modal, title='Confirmação Final'):
         task.add_done_callback(self.bot.background_tasks.discard)
 
     async def processar_radar(self, interaction: discord.Interaction, user: discord.Member, guild: discord.Guild, uid: str, id_idioma_alvo: int, nome_idioma_alvo: str, dados_server: dict, embed_tutorial: discord.Embed, jogador_nome: str, mensagem_tutorial, genero: str, idade: int):
-        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+        url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
         
         log_sart(f"📡 Radar ativado para o UID {uid} ({user.name}). À espera do idioma alvo: {id_idioma_alvo}")
@@ -449,7 +449,7 @@ class Usuarios(commands.Cog):
             )
 
         uid = db_res.data[0]["id_ff"]
-        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+        url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
 
         session = interaction.client.session

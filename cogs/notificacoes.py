@@ -87,7 +87,7 @@ class Notificacoes(commands.Cog):
                 continue
             
             try:
-                url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+                url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
                 async with session.get(url, headers=headers) as resposta:
                     if resposta.status == 200:
                         dados = await resposta.json()
@@ -172,7 +172,7 @@ class Notificacoes(commands.Cog):
                         continue
                     
                     try:
-                        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+                        url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
                         async with session.get(url, headers=headers) as resposta:
                             if resposta.status == 200:
                                 dados = await resposta.json()

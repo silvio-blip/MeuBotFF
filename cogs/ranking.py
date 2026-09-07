@@ -86,7 +86,7 @@ class Ranking(commands.Cog):
                 if not uid:
                     continue
                 
-                url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+                url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
                 dados = await fetch_api_com_retry(session, url, headers)
                 
                 if dados:

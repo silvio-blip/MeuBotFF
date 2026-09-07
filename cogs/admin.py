@@ -247,7 +247,7 @@ class ViewVerificacao(discord.ui.View):
             uid = m.get("id_ff")
             if not uid:
                 continue
-            url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+            url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
             headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
             try:
                 async with interaction.client.session.get(url, headers=headers) as resp:
@@ -662,7 +662,7 @@ async def verificacao_automatica_loop(bot):
                         uid = m.get("id_ff")
                         if not uid:
                             continue
-                        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+                        url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
                         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
                         try:
                             async with bot.session.get(url, headers=headers) as resp:
