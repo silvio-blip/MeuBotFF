@@ -119,25 +119,31 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 clan_id_raw = dados_iniciais.get("clanInfo", {}).get("clanId")
                 basic_info_raw = dados_iniciais.get("basicInfo", {})
                 nickname = basic_info_raw.get("nickname", "Desconhecido")
+                nome_guilda_usuario = dados_iniciais.get("clanInfo", {}).get("clanName", "Sem Guilda")
                 log_sart(f"🔎 /entrar - Nickname API: {nickname}")
                 log_sart(f"🔎 /entrar - clanInfo completo: {dados_iniciais.get('clanInfo')}")
                 log_sart(f"🔎 /entrar - clanId extraído: {clan_id_raw}")
+                log_sart(f"🔎 /entrar - Nome da guilda do usuário: {nome_guilda_usuario}")
                 
                 if not clan_id_raw:
                     log_sart(f"❌ /entrar - BLOQUEADO: clanInfo é null/vazio para {nickname}")
                     return await interaction.followup.send("❌ **Acesso Negado:** Esta conta não está associada a nenhuma guilda no Free Fire.", ephemeral=True)
                 clan_id = str(clan_id_raw)
+                idioma_atual_raw = dados_iniciais.get("socialInfo", {}).get("language")
+                idioma_atual = int(idioma_atual_raw) if idioma_atual_raw is not None else 7
                 log_sart(f"🔎 /entrar - Comparação: API={clan_id} vs Config={guilda_oficial} | Igual={clan_id == guilda_oficial}")
+                log_sart(f"🔎 /entrar - Idioma atual do usuário: {idioma_atual} ({IDIOMAS_FF.get(idioma_atual, 'Desconhecido')})")
                 
                 if clan_id != guilda_oficial:
                     log_sart(f"❌ /entrar - BLOQUEADO: guilda diferente para {nickname}")
-                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{nickname}` está na guilda `{clan_id}`, mas este servidor exige a guilda `{guilda_oficial}`.", ephemeral=True)
+                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{nickname}` está na guilda `{nome_guilda_usuario}`, mas este servidor exige a guilda `{guilda_oficial}`.", ephemeral=True)
                 
                 log_sart(f"✅ /entrar - GUILDA OK para {nickname}: {clan_id} == {guilda_oficial}")
 
-                idiomas_disponiveis = [k for k in IDIOMAS_FF.keys() if k != 7]
+                idiomas_disponiveis = [k for k in IDIOMAS_FF.keys() if k != idioma_atual]
                 id_idioma_alvo = random.choice(idiomas_disponiveis)
                 nome_idioma_alvo = IDIOMAS_FF[id_idioma_alvo]
+                log_sart(f"🔎 /entrar - Idioma alvo escolhido: {id_idioma_alvo} ({nome_idioma_alvo})")
 
                 embed_tutorial = discord.Embed(
                     title="⏳ Radar de Segurança Iniciado!",
@@ -147,7 +153,7 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                         f"2️⃣ Muda o idioma da assinatura para: **`{nome_idioma_alvo}`**.\n\n"
                         f"**🔎 STATUS DO RADAR AO VIVO:**\n"
                         f"▶️ Verificação: `Iniciando...`\n"
-                        f"🗣️ Idioma que o bot está a ver: **{IDIOMAS_FF.get(7, 'Português')}**\n\n"
+                        f"🗣️ Idioma atual no jogo: **{IDIOMAS_FF.get(idioma_atual, 'Desconhecido')}**\n\n"
                         f"*(Tens 5 minutos. Podes fechar este aviso, recebes uma DM no final)*"
                     ),
                     color=discord.Color.orange()
@@ -160,7 +166,7 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 log_sart(f"✅ Mensagem do radar enviada para {nickname}")
                 
                 task = asyncio.create_task(processar_radar(
-                    interaction, interaction.user, interaction.guild, uid, id_idioma_alvo, nome_idioma_alvo, self.dados_server, embed_tutorial, nickname, mensagem_tutorial, self.genero, idade_valor
+                    interaction, interaction.user, interaction.guild, uid, id_idioma_alvo, nome_idioma_alvo, self.dados_server, embed_tutorial, nickname, mensagem_tutorial, self.genero, idade_valor, idioma_atual
                 ))
                 self.bot.background_tasks.add(task)
                 task.add_done_callback(self.bot.background_tasks.discard)
@@ -171,11 +177,11 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 await interaction.followup.send("🚨 Erro ao iniciar a verificação. Tenta novamente.", ephemeral=True)
 
 
-async def processar_radar(interaction: discord.Interaction, user: discord.Member, guild: discord.Guild, uid: str, id_idioma_alvo: int, nome_idioma_alvo: str, dados_server: dict, embed_tutorial: discord.Embed, jogador_nome: str, mensagem_tutorial, genero: str, idade: int):
+async def processar_radar(interaction: discord.Interaction, user: discord.Member, guild: discord.Guild, uid: str, id_idioma_alvo: int, nome_idioma_alvo: str, dados_server: dict, embed_tutorial: discord.Embed, jogador_nome: str, mensagem_tutorial, genero: str, idade: int, idioma_atual: int):
     url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
     headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
     
-    log_sart(f"📡 Radar ativado para o UID {uid} ({user.name}). À espera do idioma alvo: {id_idioma_alvo}")
+    log_sart(f"📡 Radar ativado para o UID {uid} ({user.name}). À espera do idioma alvo: {nome_idioma_alvo}. Idioma atual: {IDIOMAS_FF.get(idioma_atual, 'Desconhecido')}")
     
     session = interaction.client.session
     verificado = False
