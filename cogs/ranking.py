@@ -191,7 +191,7 @@ class Ranking(commands.Cog):
         session = self.bot.session
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
         
-        url = f"{config.API_VERCEL_URL}?uid={uid}"
+        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
         dados = await fetch_api_com_retry(session, url, headers)
         
         if not dados:
@@ -217,7 +217,7 @@ class Ranking(commands.Cog):
             db_ranking = supabase.table("membros_verificados").select("id_ff").eq("id_servidor", id_servidor).execute()
             for membro in db_ranking.data:
                 if membro["id_ff"] != uid:
-                    url_outro = f"{config.API_VERCEL_URL}?uid={membro['id_ff']}"
+                    url_outro = f"{config.API_VERCEL_URL}/api/player?uid={membro['id_ff']}"
                     dados_outro = await fetch_api_com_retry(session, url_outro, headers)
                     if dados_outro:
                         pontos_outro = int(dados_outro.get("player", dados_outro).get("basicInfo", {}).get("rankingPoints", 0))

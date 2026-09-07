@@ -111,11 +111,12 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                     return await interaction.followup.send("⚠️ Erro de conexão com a API da Vercel.")
                     
                 dados_iniciais = await resposta_api.json()
-                clan_id_raw = dados_iniciais.get("clanInfo", {}).get("clanId")
+                player_inicial = dados_iniciais.get("player", dados_iniciais)
+                clan_id_raw = player_inicial.get("clanInfo", {}).get("clanId")
                 if not clan_id_raw:
                     return await interaction.followup.send("⚠️ **Dados Incompletos!** Verifica se a tua conta está associada a uma guilda.")
                 clan_id = str(clan_id_raw)
-                jogador_nome = dados_iniciais.get("basicInfo", {}).get("nickname", "Desconhecido")
+                jogador_nome = player_inicial.get("basicInfo", {}).get("nickname", "Desconhecido")
                 
                 if clan_id != guilda_oficial:
                     return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{jogador_nome}` não pertence à guilda registada neste servidor.")
