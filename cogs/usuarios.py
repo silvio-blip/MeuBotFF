@@ -113,12 +113,12 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 dados_iniciais = await resposta_api.json()
                 clan_id_raw = dados_iniciais.get("clanInfo", {}).get("clanId")
                 if not clan_id_raw:
-                    return await interaction.followup.send("⚠️ **Dados Incompletos!** Verifica se a tua conta está associada a uma guilda.")
+                    return await interaction.followup.send("❌ **Acesso Negado:** Esta conta não está associada a nenhuma guilda no Free Fire.", ephemeral=True)
                 clan_id = str(clan_id_raw)
                 jogador_nome = dados_iniciais.get("basicInfo", {}).get("nickname", "Desconhecido")
                 
                 if clan_id != guilda_oficial:
-                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{jogador_nome}` não pertence à guilda registada neste servidor.")
+                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{jogador_nome}` está na guilda `{clan_id}`, mas este servidor exige a guilda `{guilda_oficial}`.", ephemeral=True)
 
                 dados_pessoais = {
                     "genero": self.genero,
