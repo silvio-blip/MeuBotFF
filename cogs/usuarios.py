@@ -101,7 +101,7 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
         
         uid = self.id_ff.value.strip()
         guilda_oficial = str(self.dados_server["id_guilda_ff"])
-        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
+        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
         
         session = self.bot.session
@@ -111,220 +111,238 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                     return await interaction.followup.send("⚠️ Erro de conexão com a API da Vercel.")
                     
                 dados_iniciais = await resposta_api.json()
-                player_inicial = dados_iniciais.get("player", dados_iniciais)
-                clan_id_raw = player_inicial.get("clanInfo", {}).get("clanId")
+                clan_id_raw = dados_iniciais.get("clanInfo", {}).get("clanId")
                 if not clan_id_raw:
                     return await interaction.followup.send("⚠️ **Dados Incompletos!** Verifica se a tua conta está associada a uma guilda.")
                 clan_id = str(clan_id_raw)
-                jogador_nome = player_inicial.get("basicInfo", {}).get("nickname", "Desconhecido")
+                jogador_nome = dados_iniciais.get("basicInfo", {}).get("nickname", "Desconhecido")
                 
                 if clan_id != guilda_oficial:
                     return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{jogador_nome}` não pertence à guilda registada neste servidor.")
 
-                idiomas_disponiveis = [k for k in IDIOMAS_FF.keys() if k != 7]
-                id_idioma_alvo = random.choice(idiomas_disponiveis)
-                nome_idioma_alvo = IDIOMAS_FF[id_idioma_alvo]
-
-                embed_tutorial = discord.Embed(
-                    title="⏳ Radar de Segurança Iniciado!",
-                    description=(
-                        f"Olá **{jogador_nome}**,\n\n"
-                        f"1️⃣ Vai ao teu perfil do Free Fire **agora mesmo**.\n"
-                        f"2️⃣ Muda o idioma da assinatura para: **`{nome_idioma_alvo}`**.\n\n"
-                        f"**🔎 STATUS DO RADAR AO VIVO:**\n"
-                        f"▶️ Verificação: `Iniciando...`\n"
-                        f"🗣️ Idioma que o bot está a ver: **{IDIOMAS_FF.get(7, 'Português')}**\n\n"
-                        f"*(Tens 5 minutos. Podes fechar este aviso, recebes uma DM no final)*"
-                    ),
-                    color=discord.Color.orange()
-                )
-                embed_tutorial.set_image(url="https://i.imgur.com/aqLKQcU.png")
-                embed_tutorial.set_footer(text=f"A preparar o rastreio no UID {uid}...")
-
-                mensagem_tutorial = await interaction.followup.send(embed=embed_tutorial, ephemeral=True, wait=True)
+                dados_pessoais = {
+                    "genero": self.genero,
+                    "idade": idade_valor
+                }
                 
-                task = asyncio.create_task(processar_radar(
-                    interaction, interaction.user, interaction.guild, uid, id_idioma_alvo, nome_idioma_alvo, self.dados_server, embed_tutorial, jogador_nome, mensagem_tutorial, self.genero, idade_valor
-                ))
-                self.bot.background_tasks.add(task)
-                task.add_done_callback(self.bot.background_tasks.discard)
+                await interaction.followup.send_modal(ModalConfirmacao(self.dados_server, self.bot, dados_pessoais, uid, jogador_nome))
                 
         except Exception as e:
                 log_sart(f"🚨 Erro ao iniciar verificação: {e}")
                 await interaction.followup.send("🚨 Erro ao iniciar a verificação. Tenta novamente.", ephemeral=True)
 
 
-async def processar_radar(interaction: discord.Interaction, user: discord.Member, guild: discord.Guild, uid: str, id_idioma_alvo: int, nome_idioma_alvo: str, dados_server: dict, embed_tutorial: discord.Embed, jogador_nome: str, mensagem_tutorial, genero: str, idade: int):
-    url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
-    headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
-    
-    log_sart(f"📡 Radar ativado para o UID {uid} ({user.name}). À espera do idioma alvo: {id_idioma_alvo}")
-    
-    session = interaction.client.session
-    verificado = False
-    tentativas = 0
-    dados_radar = None
-    
-    while tentativas < 30: 
-        await asyncio.sleep(10)
-        tentativas += 1
-        try:
-            async with session.get(url, headers=headers) as resposta_radar:
-                if resposta_radar.status == 200:
-                    dados_radar = await resposta_radar.json()
+class ModalConfirmacao(discord.ui.Modal, title='Confirmação Final'):
+    def __init__(self, dados_server, bot, dados_pessoais, uid, jogador_nome):
+        super().__init__()
+        self.dados_server = dados_server
+        self.bot = bot
+        self.dados_pessoais = dados_pessoais
+        self.uid = uid
+        self.jogador_nome = jogador_nome
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        guilda_oficial = str(self.dados_server["id_guilda_ff"])
+        idioma_atual = 7
+        
+        idiomas_disponiveis = [k for k in IDIOMAS_FF.keys() if k != idioma_atual]
+        id_idioma_alvo = random.choice(idiomas_disponiveis)
+        nome_idioma_alvo = IDIOMAS_FF[id_idioma_alvo]
+
+        embed_tutorial = discord.Embed(
+            title="⏳ Radar de Segurança Iniciado!",
+            description=(
+                f"Olá **{self.jogador_nome}**,\n\n"
+                f"1️⃣ Vai ao teu perfil do Free Fire **agora mesmo**.\n"
+                f"2️⃣ Muda o idioma da assinatura para: **`{nome_idioma_alvo}`**.\n\n"
+                f"**🔎 STATUS DO RADAR AO VIVO:**\n"
+                f"▶️ Verificação: `Iniciando...`\n"
+                f"🗣️ Idioma que o bot está a ver: **{IDIOMAS_FF.get(idioma_atual, 'Desconhecido')}**\n\n"
+                f"*(Tens 5 minutos. Podes fechar este aviso, recebes uma DM no final)*"
+            ),
+            color=discord.Color.orange()
+        )
+        embed_tutorial.set_image(url="https://i.imgur.com/aqLKQcU.png")
+        embed_tutorial.set_footer(text=f"A preparar o rastreio no UID {self.uid}...")
+
+        mensagem_tutorial = await interaction.followup.send(embed=embed_tutorial, ephemeral=True, wait=True)
+        
+        task = asyncio.create_task(self.processar_radar(
+            interaction, interaction.user, interaction.guild, self.uid, id_idioma_alvo, nome_idioma_alvo, self.dados_server, embed_tutorial, self.jogador_nome, mensagem_tutorial, self.dados_pessoais.get("genero", "Prefiro não dizer"), self.dados_pessoais.get("idade", 0)
+        ))
+        self.bot.background_tasks.add(task)
+        task.add_done_callback(self.bot.background_tasks.discard)
+
+    async def processar_radar(self, interaction: discord.Interaction, user: discord.Member, guild: discord.Guild, uid: str, id_idioma_alvo: int, nome_idioma_alvo: str, dados_server: dict, embed_tutorial: discord.Embed, jogador_nome: str, mensagem_tutorial, genero: str, idade: int):
+        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+        headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
+        
+        log_sart(f"📡 Radar ativado para o UID {uid} ({user.name}). À espera do idioma alvo: {id_idioma_alvo}")
+        
+        session = interaction.client.session
+        verificado = False
+        tentativas = 0
+        dados_radar = None
+        
+        while tentativas < 30: 
+            await asyncio.sleep(10)
+            tentativas += 1
+            try:
+                async with session.get(url, headers=headers) as resposta_radar:
+                    if resposta_radar.status == 200:
+                        dados_radar = await resposta_radar.json()
+                        
+                        novo_idioma_raw = dados_radar.get("socialInfo", {}).get("language")
+                        novo_idioma = int(novo_idioma_raw) if novo_idioma_raw is not None else -1
+                        
+                        nome_idioma_detetado = IDIOMAS_FF.get(novo_idioma, f"Desconhecido (ID: {novo_idioma})")
+                        log_sart(f"🔄 Scan {tentativas}/30 [UID: {uid}] -> Idioma: {novo_idioma}")
+                        
+                        embed_tutorial.description = (
+                            f"Olá **{jogador_nome}**,\n\n"
+                            f"1️⃣ Vai ao teu perfil do Free Fire **agora mesmo**.\n"
+                            f"2️⃣ Muda o idioma da assinatura para: **`{nome_idioma_alvo}`**.\n\n"
+                            f"**🔎 STATUS DO RADAR AO VIVO:**\n"
+                            f"▶️ Verificação: `{tentativas}/30`\n"
+                            f"🗣️ Idioma que o bot está a ver: **{nome_idioma_detetado}**\n\n"
+                            f"*(Tens 5 minutos. Podes fechar este aviso, recebes uma DM no final)*"
+                        )
+                        
+                        try:
+                            await mensagem_tutorial.edit(embed=embed_tutorial)
+                        except Exception as e:
+                            log_sart(f"⚠️ Aviso: Não foi possível atualizar visualmente o Embed: {e}")
+                        
+                        if novo_idioma == id_idioma_alvo:
+                            verificado = True
+                            log_sart(f"✅ SUCESSO! Idioma alvo detetado no UID {uid}!")
+                            break
+            except Exception as e:
+                log_sart(f"⚠️ Radar scan error: {e}")
+        
+        if verificado and dados_radar:
+            log_sart(f"🛠️ A processar registo final para {user.name}...")
+            basic_info = dados_radar.get("basicInfo", {})
+            clan_info = dados_radar.get("clanInfo", {})
+            profile_info = dados_radar.get("profileInfo", {})
+            nome_guilda = clan_info.get("clanName", "Sem Guilda")
+            nivel = basic_info.get("level", "0")
+            likes = basic_info.get("liked", "0")
+            head_pic_id = basic_info.get("headPic", "")
+            avatar_id = profile_info.get("avatarId", "")
+            br_pontos = int(basic_info.get("rankingPoints", 0))
+            cs_pontos = int(basic_info.get("csRankingPoints", 0))
+            patente_br = calcular_patente(br_pontos)
+            ff_criacao = int(basic_info.get("createAt", 0))
+            status_veterano = calcular_veterano(ff_criacao)
+            
+            cargo_id = int(dados_server["cargo_id"])
+            canal_id = int(dados_server["canal_id"])
+            cargo = guild.get_role(cargo_id)
+            
+            if cargo:
+                try:
+                    await user.add_roles(cargo)
+                    log_sart(f"🎖️ Cargo entregue a {user.name}.")
                     
-                    novo_idioma_raw = dados_radar.get("socialInfo", {}).get("language")
-                    novo_idioma = int(novo_idioma_raw) if novo_idioma_raw is not None else -1
+                    db_user_check = supabase.table("membros_verificados").select("log_message_id").eq("id_discord", str(user.id)).eq("id_servidor", str(guild.id)).execute()
+                    old_log_id = None
+                    if db_user_check.data and db_user_check.data[0].get("log_message_id"):
+                        old_log_id = db_user_check.data[0]["log_message_id"]
+
+                    thumbnail_id = avatar_id or head_pic_id
                     
-                    nome_idioma_detetado = IDIOMAS_FF.get(novo_idioma, f"Desconhecido (ID: {novo_idioma})")
-                    log_sart(f"🔄 Scan {tentativas}/30 [UID: {uid}] -> Idioma: {novo_idioma}")
-                    
-                    embed_tutorial.description = (
-                        f"Olá **{jogador_nome}**,\n\n"
-                        f"1️⃣ Vai ao teu perfil do Free Fire **agora mesmo**.\n"
-                        f"2️⃣ Muda o idioma da assinatura para: **`{nome_idioma_alvo}`**.\n\n"
-                        f"**🔎 STATUS DO RADAR AO VIVO:**\n"
-                        f"▶️ Verificação: `{tentativas}/30`\n"
-                        f"🗣️ Idioma que o bot está a ver: **{nome_idioma_detetado}**\n\n"
-                        f"*(Tens 5 minutos. Podes fechar este aviso, recebes uma DM no final)*"
+                    embed_perfil = discord.Embed(
+                        title="🚨 Registo S.art | Perfil Verificado",
+                        description=f"O membro {user.mention} entrou no servidor e os seus dados foram guardados na base de dados com sucesso.",
+                        color=discord.Color.from_rgb(0, 255, 128)
                     )
+                    embed_perfil.add_field(name="👤 Nick FF", value=f"`{jogador_nome}`", inline=True)
+                    embed_perfil.add_field(name="🆔 UID", value=f"`{uid}`", inline=True)
+                    embed_perfil.add_field(name="🛡️ Guilda do Jogo", value=f"**{nome_guilda}**", inline=True)
+                    embed_perfil.add_field(name="📊 Desempenho", value=f"Nível: **{nivel}**\nLikes: **{likes}**", inline=True)
+                    embed_perfil.add_field(name="🌍 Patentes", value=f"BR: **{patente_br}** ({br_pontos} pts)\nCS: **{cs_pontos} pts**", inline=True)
+                    embed_perfil.add_field(name="🌟 Status Jogo", value=f"**{status_veterano}**", inline=True)
+                    embed_perfil.add_field(name="━━━━━━━━━━━━━━━━━━", value="**👤 Perfil Discord**", inline=False)
+                    embed_perfil.add_field(name="🖼️ Avatar", value=f"[Link]({user.display_avatar.url})", inline=True)
+                    embed_perfil.add_field(name="📅 Criação da Conta", value=f"<t:{int(user.created_at.timestamp())}:D>", inline=True)
+                    embed_perfil.add_field(name="📅 Entrada no Servidor", value=f"<t:{int(user.joined_at.timestamp())}:D>", inline=True)
+                    embed_perfil.add_field(name="🎭 Cargo Principal", value=user.top_role.mention, inline=True)
+                    embed_perfil.add_field(name="🎂 Idade", value=f"**{idade}** anos", inline=True)
+                    embed_perfil.add_field(name="🚻 Gênero", value=genero, inline=True)
+                    if ff_criacao > 0:
+                        embed_perfil.add_field(name="📅 Criação da conta do jogo", value=f"<t:{ff_criacao}:D> *(<t:{ff_criacao}:R>)*", inline=False)
+                    
+                    if thumbnail_id:
+                        embed_perfil.set_thumbnail(url=f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png")
+                    embed_perfil.set_footer(text="S.art Engine • Proteção e Base de Dados")
+
+                    msg_log_id = None
+                    canal_log = guild.get_channel(canal_id)
+                    
+                    if canal_log:
+                        if old_log_id:
+                            try:
+                                old_msg = await canal_log.fetch_message(int(old_log_id))
+                                await old_msg.delete()
+                            except Exception:
+                                pass
+
+                        nova_mensagem = await canal_log.send(embed=embed_perfil)
+                        msg_log_id = str(nova_mensagem.id)
+
+                    dados_membro = {
+                        "id_discord": str(user.id),
+                        "id_servidor": str(guild.id),
+                        "id_ff": uid,
+                        "nick_ff": jogador_nome,
+                        "log_message_id": msg_log_id,
+                        "genero": genero,
+                        "idade": idade
+                    }
+                    supabase.table("membros_verificados").upsert(dados_membro).execute()
+
+                    try:
+                        await user.send(
+                            f"✅ **Identidade Confirmada no servidor {guild.name}!**\n\nDetetei a mudança para `{nome_idioma_alvo}`. O teu cargo foi entregue com sucesso e os teus dados foram puxados para o nosso sistema! Bem-vindo à equipa **{jogador_nome}**.\n**Gênero:** {genero} | **Idade:** {idade} anos\n*(Já podes voltar a colocar o teu idioma normal no jogo)*",
+                            embed=embed_perfil, 
+                            view=ViewApagarDM()
+                        )
+                    except discord.Forbidden:
+                        pass
+                    
+                    embed_tutorial.title = "✅ Identidade Confirmada!"
+                    embed_tutorial.description = (
+                        f"Parabéns **{jogador_nome}**!\n\n"
+                        f"A tua conta foi verificada com sucesso e o cargo foi entregue.\n"
+                        f"Verifica as tuas Mensagens Privadas (DM) para veres o teu cartão de perfil completo.\n\n"
+                        f"*(Já podes voltar a colocar o teu idioma normal no jogo)*"
+                    )
+                    embed_tutorial.color = discord.Color.green()
+                    embed_tutorial.set_image(url="https://i.pinimg.com/originals/98/e5/ca/98e5ca56164596bcbb13bc847f92e8b7.gif")
+                    embed_tutorial.set_footer(text="Processo de Verificação Concluído.")
                     
                     try:
                         await mensagem_tutorial.edit(embed=embed_tutorial)
                     except Exception as e:
-                        log_sart(f"⚠️ Aviso: Não foi possível atualizar visualmente o Embed: {e}")
-                    
-                    if novo_idioma == id_idioma_alvo:
-                        verificado = True
-                        log_sart(f"✅ SUCESSO! Idioma alvo detetado no UID {uid}!")
-                        break
-        except Exception as e:
-            log_sart(f"⚠️ Radar scan error: {e}")
-    
-    if verificado and dados_radar:
-        log_sart(f"🛠️ A processar registo final para {user.name}...")
-        player_data = dados_radar.get("player", dados_radar)
-        basic_info = player_data.get("basicInfo", {})
-        clan_info = player_data.get("clanInfo", {})
-        profile_info = player_data.get("profileInfo", {})
-        
-        log_sart(f"📊 Dados radar - basicInfo keys: {list(basic_info.keys())[:5]}, clanInfo keys: {list(clan_info.keys())[:5]}, headPic: {basic_info.get('headPic', 'VAZIO')}")
-        nome_guilda = clan_info.get("clanName", "Sem Guilda")
-        nivel = basic_info.get("level", "0")
-        likes = basic_info.get("liked", "0")
-        head_pic_id = basic_info.get("headPic", "")
-        avatar_id = profile_info.get("avatarId", "")
-        br_pontos = int(basic_info.get("rankingPoints", 0))
-        cs_pontos = int(basic_info.get("csRankingPoints", 0))
-        patente_br = calcular_patente(br_pontos)
-        ff_criacao = int(basic_info.get("createAt", 0))
-        status_veterano = calcular_veterano(ff_criacao)
-        
-        cargo_id = int(dados_server["cargo_id"])
-        canal_id = int(dados_server["canal_id"])
-        cargo = guild.get_role(cargo_id)
-        
-        if cargo:
-            try:
-                await user.add_roles(cargo)
-                log_sart(f"🎖️ Cargo entregue a {user.name}.")
-                
-                db_user_check = supabase.table("membros_verificados").select("log_message_id").eq("id_discord", str(user.id)).eq("id_servidor", str(guild.id)).execute()
-                old_log_id = None
-                if db_user_check.data and db_user_check.data[0].get("log_message_id"):
-                    old_log_id = db_user_check.data[0]["log_message_id"]
+                        log_sart(f"⚠️ Aviso: Não foi possível atualizar o Embed de sucesso: {e}")
 
-                    thumbnail_id = avatar_id or head_pic_id
-                
-                embed_perfil = discord.Embed(
-                    title="🚨 Registo S.art | Perfil Verificado",
-                    description=f"O membro {user.mention} entrou no servidor e os seus dados foram guardados na base de dados com sucesso.",
-                    color=discord.Color.from_rgb(0, 255, 128)
-                )
-                embed_perfil.add_field(name="👤 Nick FF", value=f"`{jogador_nome}`", inline=True)
-                embed_perfil.add_field(name="🆔 UID", value=f"`{uid}`", inline=True)
-                embed_perfil.add_field(name="🛡️ Guilda do Jogo", value=f"**{nome_guilda}**", inline=True)
-                embed_perfil.add_field(name="📊 Desempenho", value=f"Nível: **{nivel}**\nLikes: **{likes}**", inline=True)
-                embed_perfil.add_field(name="🌍 Patentes", value=f"BR: **{patente_br}** ({br_pontos} pts)\nCS: **{cs_pontos} pts**", inline=True)
-                embed_perfil.add_field(name="🌟 Status Jogo", value=f"**{status_veterano}**", inline=True)
-                embed_perfil.add_field(name="━━━━━━━━━━━━━━━━━━", value="**👤 Perfil Discord**", inline=False)
-                embed_perfil.add_field(name="🖼️ Avatar", value=f"[Link]({user.display_avatar.url})", inline=True)
-                embed_perfil.add_field(name="📅 Criação da Conta", value=f"<t:{int(user.created_at.timestamp())}:D>", inline=True)
-                embed_perfil.add_field(name="📅 Entrada no Servidor", value=f"<t:{int(user.joined_at.timestamp())}:D>", inline=True)
-                embed_perfil.add_field(name="🎭 Cargo Principal", value=user.top_role.mention, inline=True)
-                embed_perfil.add_field(name="🎂 Idade", value=f"**{idade}** anos", inline=True)
-                embed_perfil.add_field(name="🚻 Gênero", value=genero, inline=True)
-                if ff_criacao > 0:
-                    embed_perfil.add_field(name="📅 Criação da conta do jogo", value=f"<t:{ff_criacao}:D> *(<t:{ff_criacao}:R>)*", inline=False)
-                
-                if thumbnail_id:
-                    embed_perfil.set_thumbnail(url=f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png")
-                embed_perfil.set_footer(text="S.art Engine • Proteção e Base de Dados")
-
-                msg_log_id = None
-                canal_log = guild.get_channel(canal_id)
-                
-                if canal_log:
-                    if old_log_id:
-                        try:
-                            old_msg = await canal_log.fetch_message(int(old_log_id))
-                            await old_msg.delete()
-                        except Exception:
-                            pass
-
-                    nova_mensagem = await canal_log.send(embed=embed_perfil)
-                    msg_log_id = str(nova_mensagem.id)
-
-                dados_membro = {
-                    "id_discord": str(user.id),
-                    "id_servidor": str(guild.id),
-                    "id_ff": uid,
-                    "nick_ff": jogador_nome,
-                    "log_message_id": msg_log_id,
-                    "genero": genero,
-                    "idade": idade
-                }
-                supabase.table("membros_verificados").upsert(dados_membro).execute()
-
-                try:
-                    await user.send(
-                        f"✅ **Identidade Confirmada no servidor {guild.name}!**\n\nDetetei a mudança para `{nome_idioma_alvo}`. O teu cargo foi entregue com sucesso e os teus dados foram puxados para o nosso sistema! Bem-vindo à equipa **{jogador_nome}**.\n**Gênero:** {genero} | **Idade:** {idade} anos\n*(Já podes voltar a colocar o teu idioma normal no jogo)*",
-                        embed=embed_perfil, 
-                        view=ViewApagarDM()
-                    )
                 except discord.Forbidden:
-                    pass
-                    
-                embed_tutorial.title = "✅ Identidade Confirmada!"
-                embed_tutorial.description = (
-                    f"Parabéns **{jogador_nome}**!\n\n"
-                    f"A tua conta foi verificada com sucesso e o cargo foi entregue.\n"
-                    f"Verifica as tuas Mensagens Privadas (DM) para veres o teu cartão de perfil completo.\n\n"
-                    f"*(Já podes voltar a colocar o teu idioma normal no jogo)*"
-                )
-                embed_tutorial.color = discord.Color.green()
-                embed_tutorial.set_image(url="https://i.pinimg.com/originals/98/e5/ca/98e5ca56164596bcbb13bc847f92e8b7.gif")
-                embed_tutorial.set_footer(text="Processo de Verificação Concluído.")
-                
-                try:
-                    await mensagem_tutorial.edit(embed=embed_tutorial)
-                except Exception as e:
-                    log_sart(f"⚠️ Aviso: Não foi possível atualizar o Embed de sucesso: {e}")
-
-            except discord.Forbidden:
-                log_sart(f"❌ O Discord bloqueou a entrega do cargo a {user.name}.")
-    else:
-        log_sart(f"❌ TIMEOUT: O radar expirou para {user.name}.")
-        
-        embed_tutorial.title = "❌ Tempo Esgotado!"
-        embed_tutorial.description = f"Não consegui detetar a mudança para `{nome_idioma_alvo}` em 5 minutos. Tenta `/entrar` novamente."
-        embed_tutorial.color = discord.Color.red()
-        embed_tutorial.set_image(url=None) 
-        embed_tutorial.set_footer(text="Processo Cancelado.")
-        try:
-            await mensagem_tutorial.edit(embed=embed_tutorial)
-        except:
-            pass
+                    log_sart(f"❌ O Discord bloqueou a entrega do cargo a {user.name}.")
+        else:
+            log_sart(f"❌ TIMEOUT: O radar expirou para {user.name}.")
+            
+            embed_tutorial.title = "❌ Tempo Esgotado!"
+            embed_tutorial.description = f"Não consegui detetar a mudança para `{nome_idioma_alvo}` em 5 minutos. Tenta `/entrar` novamente."
+            embed_tutorial.color = discord.Color.red()
+            embed_tutorial.set_image(url=None) 
+            embed_tutorial.set_footer(text="Processo Cancelado.")
+            try:
+                await mensagem_tutorial.edit(embed=embed_tutorial)
+            except:
+                pass
 
 
 class Usuarios(commands.Cog):
@@ -416,7 +434,7 @@ class Usuarios(commands.Cog):
             )
 
         uid = db_res.data[0]["id_ff"]
-        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
+        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
 
         session = interaction.client.session
@@ -429,12 +447,9 @@ class Usuarios(commands.Cog):
             log_sart(f"🚨 Erro na API durante /perfil: {e}")
             return await interaction.followup.send(f"🚨 Erro de rede ao consultar o perfil.")
 
-        player_data = dados.get("player", dados)
-        basic_info = player_data.get("basicInfo", {})
-        clan_info = player_data.get("clanInfo", {})
-        profile_info = player_data.get("profileInfo", {})
-        
-        log_sart(f"📊 Dados perfil - basicInfo keys: {list(basic_info.keys())[:5]}, clanInfo keys: {list(clan_info.keys())[:5]}, headPic: {basic_info.get('headPic', 'VAZIO')}")
+        basic_info = dados.get("basicInfo", {})
+        clan_info = dados.get("clanInfo", {})
+        profile_info = dados.get("profileInfo", {})
 
         nome_guilda = clan_info.get("clanName", "Sem Guilda")
         jogador_nome = basic_info.get("nickname", "Desconhecido")
