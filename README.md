@@ -66,7 +66,7 @@ python main.py
 | `/perfil` | Mostra o teu perfil completo | Membro verificado |
 | `/perfil @membro` | Mostra o perfil de outro membro | Membro verificado |
 
-**Dados mostrados:** Nick FF, UID, Guilda, Nível, Likes, Patente BR, Clash Squad, Veterano, Avatar do FF, Perfil Discord (Avatar, Criação da Conta, Entrada no Servidor, Cargo Principal, Gênero, Idade), Data de criação.
+**Dados mostrados:** Nick FF, UID, Guilda, Nível, Likes, Patente BR, Clash Squad, Veterano, Avatar do FF (`basicInfo.headPic`), Perfil Discord (Avatar, Criação da Conta, Entrada no Servidor, Cargo Principal, Gênero, Idade), Data de criação.
 
 ---
 
