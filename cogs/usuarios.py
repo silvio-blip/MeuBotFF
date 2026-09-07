@@ -135,6 +135,37 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 
                 log_sart(f"✅ /entrar - GUILDA OK para {nickname}: {clan_id} == {guilda_oficial}")
 
+                idiomas_disponiveis = [k for k in IDIOMAS_FF.keys() if k != 7]
+                id_idioma_alvo = random.choice(idiomas_disponiveis)
+                nome_idioma_alvo = IDIOMAS_FF[id_idioma_alvo]
+
+                embed_tutorial = discord.Embed(
+                    title="⏳ Radar de Segurança Iniciado!",
+                    description=(
+                        f"Olá **{nickname}**,\n\n"
+                        f"1️⃣ Vai ao teu perfil do Free Fire **agora mesmo**.\n"
+                        f"2️⃣ Muda o idioma da assinatura para: **`{nome_idioma_alvo}`**.\n\n"
+                        f"**🔎 STATUS DO RADAR AO VIVO:**\n"
+                        f"▶️ Verificação: `Iniciando...`\n"
+                        f"🗣️ Idioma que o bot está a ver: **{IDIOMAS_FF.get(7, 'Português')}**\n\n"
+                        f"*(Tens 5 minutos. Podes fechar este aviso, recebes uma DM no final)*"
+                    ),
+                    color=discord.Color.orange()
+                )
+                embed_tutorial.set_image(url="https://i.imgur.com/aqLKQcU.png")
+                embed_tutorial.set_footer(text=f"A preparar o rastreio no UID {uid}...")
+
+                log_sart(f"📡 Radar iniciado para {nickname} ({uid}). Idioma alvo: {nome_idioma_alvo}")
+                mensagem_tutorial = await interaction.followup.send(embed=embed_tutorial, ephemeral=True)
+                log_sart(f"✅ Mensagem do radar enviada para {nickname}")
+                
+                task = asyncio.create_task(processar_radar(
+                    interaction, interaction.user, interaction.guild, uid, id_idioma_alvo, nome_idioma_alvo, self.dados_server, embed_tutorial, nickname, mensagem_tutorial, self.genero, idade_valor
+                ))
+                self.bot.background_tasks.add(task)
+                task.add_done_callback(self.bot.background_tasks.discard)
+                log_sart(f"✅ Task do radar criada para {nickname}")
+
         except Exception as e:
                 log_sart(f"🚨 Erro ao iniciar verificação: {e}")
                 await interaction.followup.send("🚨 Erro ao iniciar a verificação. Tenta novamente.", ephemeral=True)
