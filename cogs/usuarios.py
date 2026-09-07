@@ -202,9 +202,9 @@ async def processar_radar(interaction: discord.Interaction, user: discord.Member
     
     if verificado and dados_radar:
         log_sart(f"🛠️ A processar registo final para {user.name}...")
-        basic_info = dados_radar.get("player", dados_radar).get("basicInfo", {})
-        clan_info = dados_radar.get("player", dados_radar).get("clanInfo", {})
-        profile_info = dados_radar.get("player", dados_radar).get("profileInfo", {})
+        basic_info = dados_radar.get("player", {}).get("basicInfo", {})
+        clan_info = dados_radar.get("player", {}).get("clanInfo", {})
+        profile_info = dados_radar.get("player", {}).get("profileInfo", {})
         nome_guilda = clan_info.get("clanName", "Sem Guilda")
         nivel = basic_info.get("level", "0")
         likes = basic_info.get("liked", "0")
@@ -425,10 +425,9 @@ class Usuarios(commands.Cog):
             log_sart(f"🚨 Erro na API durante /perfil: {e}")
             return await interaction.followup.send(f"🚨 Erro de rede ao consultar o perfil.")
 
-        player_data = dados.get("player", dados)
-        basic_info = player_data.get("basicInfo", {})
-        clan_info = player_data.get("clanInfo", {})
-        profile_info = player_data.get("profileInfo", {})
+        basic_info = dados.get("player", {}).get("basicInfo", {})
+        clan_info = dados.get("player", {}).get("clanInfo", {})
+        profile_info = dados.get("player", {}).get("profileInfo", {})
 
         nome_guilda = clan_info.get("clanName", "Sem Guilda")
         jogador_nome = basic_info.get("nickname", "Desconhecido")
