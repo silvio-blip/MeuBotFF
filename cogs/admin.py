@@ -242,6 +242,7 @@ class ViewVerificacao(discord.ui.View):
         membros = supabase.table("membros_verificados").select("*").eq("id_servidor", guild_id).execute()
         cargo_id = int(servidor.get("cargo_id") or 0)
         cargo = interaction.guild.get_role(cargo_id) if cargo_id else None
+        guilda_ff_id = str(servidor.get("id_guilda_ff", ""))
         for m in membros.data or []:
             uid = m.get("id_ff")
             if not uid:
@@ -254,16 +255,17 @@ class ViewVerificacao(discord.ui.View):
                         continue
                     dados = await resp.json()
                     player_data = dados.get("player", dados)
-                    clan_info = player_data.get("clanInfo", {})
+                    clan_info = player_data.get("clanInfo") or {}
                     clan_id = str(clan_info.get("clanId", ""))
-                    if clan_id != str(servidor.get("id_guilda_ff")):
-                        member = interaction.guild.get_member(int(m["id_discord"]))
+                    member = interaction.guild.get_member(int(m["id_discord"]))
+                    if not clan_id or clan_id != guilda_ff_id:
                         if member and cargo and cargo in member.roles:
                             try:
                                 await member.remove_roles(cargo)
                                 removidos.append(member.display_name)
                             except discord.Forbidden:
                                 pass
+                        supabase.table("membros_verificados").delete().eq("id_discord", str(m["id_discord"])).eq("id_servidor", guild_id).execute()
             except Exception:
                 pass
 
@@ -668,16 +670,19 @@ async def verificacao_automatica_loop(bot):
                                     continue
                                 dados = await resp.json()
                                 player_data = dados.get("player", dados)
-                                clan_info = player_data.get("clanInfo", {})
+                                clan_info = player_data.get("clanInfo") or {}
                                 clan_id = str(clan_info.get("clanId", ""))
-                                if clan_id != guilda_ff_id:
-                                    member = guild.get_member(int(m["id_discord"]))
-                                    if member and cargo in member.roles:
+                                member = guild.get_member(int(m["id_discord"]))
+                                if not clan_id or clan_id != guilda_ff_id:
+                                    if member and cargo and cargo in member.roles:
                                         try:
                                             await member.remove_roles(cargo)
                                             removidos.append(member.display_name)
                                         except discord.Forbidden:
                                             pass
+                                    supabase.table("membros_verificados").delete().eq("id_discord", str(m["id_discord"])).eq("id_servidor", guild_id).execute()
+                        except Exception:
+                            pass
                         except Exception:
                             pass
 
