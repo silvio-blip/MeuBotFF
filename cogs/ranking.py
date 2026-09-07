@@ -90,8 +90,9 @@ class Ranking(commands.Cog):
                 dados = await fetch_api_com_retry(session, url, headers)
                 
                 if dados:
-                    basic_info = dados.get("basicInfo", {})
-                    clan_info = dados.get("clanInfo", {})
+                    player_data = dados.get("player", dados)
+                    basic_info = player_data.get("basicInfo", {})
+                    clan_info = player_data.get("clanInfo", {})
                     
                     br_pontos = int(basic_info.get("rankingPoints", 0))
                     rank_tier = basic_info.get("rank", 0)
@@ -196,7 +197,7 @@ class Ranking(commands.Cog):
         if not dados:
             return await interaction.followup.send("❌ Erro ao buscar dados do jogo. Tenta de novo.")
         
-        basic_info = dados.get("basicInfo", {})
+        basic_info = dados.get("player", dados).get("basicInfo", {})
         br_pontos = int(basic_info.get("rankingPoints", 0))
         nivel = basic_info.get("level", 0)
         likes = basic_info.get("liked", 0)
@@ -219,7 +220,7 @@ class Ranking(commands.Cog):
                     url_outro = f"{config.API_VERCEL_URL}?uid={membro['id_ff']}"
                     dados_outro = await fetch_api_com_retry(session, url_outro, headers)
                     if dados_outro:
-                        pontos_outro = int(dados_outro.get("basicInfo", {}).get("rankingPoints", 0))
+                        pontos_outro = int(dados_outro.get("player", dados_outro).get("basicInfo", {}).get("rankingPoints", 0))
                         if pontos_outro > br_pontos:
                             posicao += 1
         
@@ -263,11 +264,12 @@ class Ranking(commands.Cog):
             if not uid:
                 continue
             
-            url = f"{config.API_VERCEL_URL}?uid={uid}"
+            url = f"{config.API_VERCEL_URL}/api/player?uid={uid}"
             dados = await fetch_api_com_retry(session, url, headers)
             
             if dados:
-                basic_info = dados.get("basicInfo", {})
+                player_data = dados.get("player", dados)
+                basic_info = player_data.get("basicInfo", {})
                 supabase.table("ranking_cache").upsert({
                     "usuario_id": membro["id_discord"],
                     "guilda_id": id_servidor,

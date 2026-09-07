@@ -91,7 +91,8 @@ class Notificacoes(commands.Cog):
                 async with session.get(url, headers=headers) as resposta:
                     if resposta.status == 200:
                         dados = await resposta.json()
-                        clan_id = str(dados.get("clanInfo", {}).get("clanId", ""))
+                        player_data = dados.get("player", dados)
+                        clan_id = str(player_data.get("clanInfo", {}).get("clanId", ""))
                         
                         if clan_id != guilda_ff_id:
                             sairam.append({
@@ -175,7 +176,8 @@ class Notificacoes(commands.Cog):
                         async with session.get(url, headers=headers) as resposta:
                             if resposta.status == 200:
                                 dados = await resposta.json()
-                                clan_id = str(dados.get("clanInfo", {}).get("clanId", ""))
+                                player_data = dados.get("player", dados)
+                                clan_id = str(player_data.get("clanInfo", {}).get("clanId", ""))
                                 
                                 if clan_id != guilda_ff_id:
                                     sairam.append({

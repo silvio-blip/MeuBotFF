@@ -78,8 +78,8 @@ class Pesquisa(commands.Cog):
         if not dados:
             return await interaction.followup.send(f"❌ Não encontrei ninguém com **{busca}**.")
         
-        basic_info = dados.get("basicInfo", {})
-        clan_info = dados.get("clanInfo", {})
+        basic_info = dados.get("player", dados).get("basicInfo", {})
+        clan_info = dados.get("player", dados).get("clanInfo", {})
         
         jogador_nome = basic_info.get("nickname", "Desconhecido")
         uid = basic_info.get("accountId", "—")
