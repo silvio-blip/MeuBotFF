@@ -136,7 +136,7 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 
                 if clan_id != guilda_oficial:
                     log_sart(f"❌ /entrar - BLOQUEADO: guilda diferente para {nickname}")
-                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{nickname}` está na guilda `{nome_guilda_usuario}`, mas este servidor exige a guilda `{guilda_oficial}`.", ephemeral=True)
+                    return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{nickname}` está na guilda `{nome_guilda_usuario}`, que não é a guilda deste servidor.", ephemeral=True)
                 
                 log_sart(f"✅ /entrar - GUILDA OK para {nickname}: {clan_id} == {guilda_oficial}")
 
