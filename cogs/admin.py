@@ -4,6 +4,8 @@ from discord import app_commands
 from discord.ext import commands
 import random
 import string
+import asyncio
+import config
 from datetime import datetime, timezone
 from database import supabase
 
@@ -58,6 +60,7 @@ class ViewMenuPrincipal(discord.ui.View):
             discord.SelectOption(label="Torneios", value="torneios", emoji="🏆", description="Criar e gerir torneios"),
             discord.SelectOption(label="Ranking", value="ranking", emoji="📊", description="Ranking dos membros"),
             discord.SelectOption(label="Estatísticas", value="stats", emoji="📊", description="Dados do servidor"),
+            discord.SelectOption(label="Verificação Automática", value="verificacao", emoji="🔄", description="Remover cargo de quem saiu da guilda FF"),
         ],
         custom_id="painel_menu_principal"
     )
@@ -206,6 +209,66 @@ class ViewTorneios(discord.ui.View):
     @discord.ui.button(label="Definir Canal de Vitórias", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="torneios_canal_vitorias")
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde as vitórias dos torneios são anunciadas:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "torneios_config", "canal_vitorias", "torneios"), ephemeral=True)
+
+class ViewVerificacao(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.select(placeholder="📂 Voltar ao menu principal...", options=[discord.SelectOption(label="Menu Principal", value="main", emoji="📋")], custom_id="verificacao_back")
+    async def back(self, interaction, select):
+        embed, view = build_categoria(interaction.guild, "main")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Definir Canal de Verificação", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="verificacao_canal")
+    async def btn_canal(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa sobre remoções de cargo:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "verificacao_automatica_config", "canal_verificacao_id", "verificacao"), ephemeral=True)
+
+    @discord.ui.button(label="Ligar/Desligar Verificação", style=discord.ButtonStyle.success, emoji="🔄", custom_id="verificacao_toggle")
+    async def btn_toggle(self, interaction, button):
+        toggle_config("verificacao_automatica_config", str(interaction.guild_id))
+        embed, view = build_categoria(interaction.guild, "verificacao")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Verificar Agora", style=discord.ButtonStyle.danger, emoji="⚡", custom_id="verificacao_manual")
+    async def btn_manual(self, interaction, button):
+        await interaction.response.defer(ephemeral=True)
+        guild_id = str(interaction.guild_id)
+        cfg = ler_sub("verificacao_automatica_config", guild_id)
+        servidor = ler_config(guild_id)
+        if not servidor.get("id_guilda_ff"):
+            return await interaction.followup.send("❌ Servidor sem guilda configurada.", ephemeral=True)
+
+        removidos = []
+        membros = supabase.table("membros_verificados").select("*").eq("id_servidor", guild_id).execute()
+        cargo_id = int(servidor.get("cargo_id") or 0)
+        cargo = interaction.guild.get_role(cargo_id) if cargo_id else None
+        for m in membros.data or []:
+            uid = m.get("id_ff")
+            if not uid:
+                continue
+            url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+            headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
+            try:
+                async with interaction.client.session.get(url, headers=headers) as resp:
+                    if resp.status != 200:
+                        continue
+                    dados = await resp.json()
+                    player_data = dados.get("player", dados)
+                    clan_info = player_data.get("clanInfo", {})
+                    clan_id = str(clan_info.get("clanId", ""))
+                    if clan_id != str(servidor.get("id_guilda_ff")):
+                        member = interaction.guild.get_member(int(m["id_discord"]))
+                        if member and cargo and cargo in member.roles:
+                            try:
+                                await member.remove_roles(cargo)
+                                removidos.append(member.display_name)
+                            except discord.Forbidden:
+                                pass
+            except Exception:
+                pass
+
+        texto = "\n".join(f"• {nome}" for nome in removidos) if removidos else "Nenhum membro removido."
+        await interaction.followup.send(f"✅ Verificação manual concluída.\n**Removidos:**\n{texto}", ephemeral=True)
 
 def build_categoria(guild, cat):
     guild_id = str(guild.id)
@@ -361,6 +424,17 @@ def build_categoria(guild, cat):
         embed.add_field(name="Notificações", value=on_off(noti_cfg.get("habilitado", False)), inline=True)
         embed.set_footer(text="Usa o menu abaixo para voltar")
         return embed, ViewMenuPrincipal()
+
+    elif cat == "verificacao":
+        ver_cfg = ler_sub("verificacao_automatica_config", guild_id)
+        ver_on = ver_cfg.get("habilitado", False)
+        canal_ver = safe_channel(guild, ver_cfg.get("canal_verificacao_id"))
+        embed = discord.Embed(title="🔄 Verificação Automática", description="Remove automaticamente o cargo de registro de quem saiu da guilda FF.\nRoda a cada 24h (horário de Portugal).", color=discord.Color.from_rgb(0, 200, 150))
+        embed.add_field(name="Status", value=on_off(ver_on), inline=True)
+        embed.add_field(name="Canal de Logs", value=canal_ver.mention if canal_ver else "⚠️ Não definido", inline=True)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n📢 **Definir Canal** — Onde o bot avisa das remoções\n🔄 **Ligar/Desligar** — Ativa ou desativa a verificação\n⚡ **Verificar Agora** — Roda a verificação manualmente", inline=False)
+        embed.set_footer(text="Usa o menu abaixo para voltar")
+        return embed, ViewVerificacao()
 
     embed, view = build_categoria(guild, "main")
     return embed, view
@@ -551,6 +625,73 @@ class Admin(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def setup(bot):
-    for v in [ViewMenuPrincipal(), ViewBase(), ViewWarns(), ViewBV(), ViewRaid(), ViewNoti(), ViewTorneios()]:
+    for v in [ViewMenuPrincipal(), ViewBase(), ViewWarns(), ViewBV(), ViewRaid(), ViewNoti(), ViewTorneios(), ViewVerificacao()]:
         bot.add_view(v)
-    await bot.add_cog(Admin(bot))
+    cog = Admin(bot)
+    await bot.add_cog(cog)
+    if not getattr(bot, "verificacao_automatica_task", None):
+        bot.verificacao_automatica_task = bot.loop.create_task(verificacao_automatica_loop(bot))
+
+
+async def verificacao_automatica_loop(bot):
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            agora = datetime.now(timezone.utc)
+            if agora.hour == 0 and agora.minute == 0:
+                for guild in bot.guilds:
+                    guild_id = str(guild.id)
+                    cfg = supabase.table("verificacao_automatica_config").select("*").eq("guilda_id", guild_id).execute()
+                    if not cfg.data or not cfg.data[0].get("habilitado"):
+                        continue
+                    servidor = supabase.table("servidores").select("*").eq("id_discord", guild_id).execute()
+                    if not servidor.data:
+                        continue
+                    dados_servidor = servidor.data[0]
+                    guilda_ff_id = str(dados_servidor.get("id_guilda_ff", ""))
+                    cargo_id = int(dados_servidor.get("cargo_id") or 0)
+                    cargo = guild.get_role(cargo_id) if cargo_id else None
+                    if not guilda_ff_id or not cargo:
+                        continue
+
+                    membros = supabase.table("membros_verificados").select("*").eq("id_servidor", guild_id).execute()
+                    removidos = []
+                    for m in membros.data or []:
+                        uid = m.get("id_ff")
+                        if not uid:
+                            continue
+                        url = f"{config.API_VERCEL_URL}/api/player?uid={uid}&fields=basic,profile"
+                        headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
+                        try:
+                            async with bot.session.get(url, headers=headers) as resp:
+                                if resp.status != 200:
+                                    continue
+                                dados = await resp.json()
+                                player_data = dados.get("player", dados)
+                                clan_info = player_data.get("clanInfo", {})
+                                clan_id = str(clan_info.get("clanId", ""))
+                                if clan_id != guilda_ff_id:
+                                    member = guild.get_member(int(m["id_discord"]))
+                                    if member and cargo in member.roles:
+                                        try:
+                                            await member.remove_roles(cargo)
+                                            removidos.append(member.display_name)
+                                        except discord.Forbidden:
+                                            pass
+                        except Exception:
+                            pass
+
+                    if removidos:
+                        canal_id = cfg.data[0].get("canal_verificacao_id")
+                        canal = guild.get_channel(int(canal_id)) if canal_id and str(canal_id).isdigit() else None
+                        texto = "\n".join(f"• {nome}" for nome in removidos)
+                        embed = discord.Embed(title="🔄 Verificação Automática", description=f"Removidos **{len(removidos)}** cargos de registro por saída da guilda:\n{texto}", color=discord.Color.from_rgb(255, 50, 50))
+                        if canal:
+                            try:
+                                await canal.send(embed=embed)
+                            except Exception:
+                                pass
+                        log_sart(f"🔄 Verificação automática em {guild.name}: {len(removidos)} removidos.")
+        except Exception as e:
+            log_sart(f"🚨 Erro na verificação automática: {e}")
+        await asyncio.sleep(60)

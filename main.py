@@ -18,6 +18,7 @@ class MeuBot(commands.Bot):
         super().__init__(command_prefix='!', intents=intents)
         self.session: aiohttp.ClientSession = None
         self.background_tasks = set()
+        self.verificacao_automatica_task = None
 
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
