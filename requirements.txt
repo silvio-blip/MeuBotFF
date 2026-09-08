@@ -1,4 +1,14 @@
-discord.py>=2.3.0
-supabase>=2.0.0
-aiohttp>=3.9.0
-python-dotenv>=1.0.0
+# Dependências do bot S.art
+# Bot do Discord para Free Fire com verificação por radar, ranking, torneios e painel admin
+
+# Discord
+discord.py>=2.3.0          # Biblioteca principal do bot
+
+# Banco de dados
+supabase>=2.0.0             # Cliente Supabase para Python
+
+# HTTP / API
+aiohttp>=3.9.0              # Cliente HTTP assíncrono usado pelo bot e pela API FF
+
+# Variáveis de ambiente
+python-dotenv>=1.0.0        # Carrega variáveis do arquivo .env
