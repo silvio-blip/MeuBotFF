@@ -1,3 +1,5 @@
+# tudo ok
+
 # Deploy no Oracle Cloud (Gratis para Sempre)
 
 Guia passo a passo para hospedar o bot no **Oracle Cloud Always Free Tier** — um servidor virtual dedicado, 24/7, sem custos e sem limite de tempo.
