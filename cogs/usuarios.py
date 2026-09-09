@@ -3,12 +3,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import aiohttp
+import io
 import time
 import asyncio
 import random
 import config
 from datetime import datetime
 from database import supabase
+from cogs.card_utils import gerar_perfil_card, download_image
 
 
 def log_sart(mensagem):
@@ -602,7 +604,45 @@ class Usuarios(commands.Cog):
             )
 
         embed_perfil.set_footer(text="S.art Engine • Proteção e Base de Dados")
-        await interaction.followup.send(embed=embed_perfil)
+
+        from cogs.economia import get_emoji_moeda
+        emoji_moeda = get_emoji_moeda(str(interaction.guild_id))
+
+        try:
+            discord_avatar = await download_image(f"{alvo.display_avatar.url}?size=256", session)
+
+            if thumbnail_id:
+                ff_avatar_url = f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png"
+            else:
+                ff_avatar_url = "https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/1446515346201776283_1774.png"
+            ff_avatar = await download_image(ff_avatar_url, session)
+
+            if discord_avatar and ff_avatar:
+                card_bytes = gerar_perfil_card(
+                    nick_ff=jogador_nome,
+                    uid=uid,
+                    nome_guilda=nome_guilda,
+                    nivel=nivel,
+                    likes=likes,
+                    br_pontos=br_pontos,
+                    patente_br=patente_br,
+                    cs_pontos=cs_pontos,
+                    status_veterano=status_veterano,
+                    moedas=moedas,
+                    emoji_moeda=emoji_moeda,
+                    data_criacao_jogo=datetime.fromtimestamp(ff_criacao).strftime("%d/%m/%Y") if ff_criacao > 0 else "Desconhecido",
+                    discord_avatar_img=discord_avatar,
+                    ff_avatar_img=ff_avatar
+                )
+
+                file = discord.File(io.BytesIO(card_bytes), filename="perfil.png")
+                embed_perfil.set_image(url="attachment://perfil.png")
+                await interaction.followup.send(embed=embed_perfil, file=file)
+            else:
+                await interaction.followup.send(embed=embed_perfil)
+        except Exception as e:
+            log_sart(f"⚠️ Erro ao gerar card de perfil: {e}")
+            await interaction.followup.send(embed=embed_perfil)
 
 
 async def setup(bot):
