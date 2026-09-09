@@ -64,6 +64,17 @@ class Convites(commands.Cog):
                     "guilda_id": id_servidor
                 }).execute()
                 
+                # Economia: recompensa por convite válido
+                try:
+                    cfg_economia = supabase.table("economia_config").select("*").eq("guilda_id", id_servidor).execute()
+                    if cfg_economia.data and cfg_economia.data[0].get("habilitado"):
+                        moedas = cfg_economia.data[0].get("moedas_convite", 15)
+                        db_user = supabase.table("membros_verificados").select("moedas").eq("id_discord", str(convidador.id)).eq("id_servidor", id_servidor).execute()
+                        saldo_atual = db_user.data[0]["moedas"] if db_user.data and db_user.data[0].get("moedas") is not None else 0
+                        supabase.table("membros_verificados").update({"moedas": saldo_atual + int(moedas)}).eq("id_discord", str(convidador.id)).eq("id_servidor", id_servidor).execute()
+                except Exception:
+                    pass
+                
                 # Enviar notificação se canal configurado
                 canal_id = db_config.data[0].get("canal_notificacoes") if db_config.data else None
                 if canal_id and str(canal_id).isdigit():

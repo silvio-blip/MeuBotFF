@@ -34,6 +34,7 @@ class MeuBot(commands.Bot):
         await self.load_extension('cogs.ajuda')
         await self.load_extension('cogs.pesquisa')
         await self.load_extension('cogs.convites')
+        await self.load_extension('cogs.economia')
         self.tree.interaction_check = self.global_check
         if os.getenv("SYNC_COMMANDS", "true").lower() == "true":
             await self.tree.sync()
@@ -49,11 +50,11 @@ class MeuBot(commands.Bot):
     async def global_check(self, interaction: discord.Interaction) -> bool:
         if not interaction.command:
             return True
-        if interaction.command.name in ["configurar", "entrar"]:
+        if interaction.command.name in ["configurar", "entrar", "pesquisa"]:
             return True
 
         try:
-            db_res = supabase.table("servidores").select("id_discord").eq("id_discord", str(interaction.guild_id)).execute()
+            db_res = supabase.table("servidores").select("id_discord", "cargo_gestao_id").eq("id_discord", str(interaction.guild_id)).execute()
             if not db_res.data:
                 await interaction.response.send_message("⛔ **Servidor não registado!** O dono deve usar o `/configurar` primeiro.", ephemeral=True)
                 return False
@@ -61,15 +62,28 @@ class MeuBot(commands.Bot):
             print(f"🚨 Erro no global_check (servidores): {e}")
             return False
 
-        if interaction.user.id != interaction.guild.owner_id:
-            try:
-                db_user = supabase.table("membros_verificados").select("id_discord").eq("id_discord", str(interaction.user.id)).eq("id_servidor", str(interaction.guild_id)).execute()
-                if not db_user.data:
-                    await interaction.response.send_message("⛔ **Acesso Negado!** Precisas de estar verificado (`/entrar`) para usar comandos.", ephemeral=True)
-                    return False
-            except Exception as e:
-                print(f"🚨 Erro no global_check (membros): {e}")
+        is_owner = interaction.user.id == interaction.guild.owner_id
+        is_admin = interaction.user.guild_permissions.administrator
+        is_gestao = False
+        if not is_owner and not is_admin:
+            servidor = db_res.data[0]
+            cargo_gestao_id = servidor.get("cargo_gestao_id")
+            if cargo_gestao_id:
+                cargo_gestao = interaction.guild.get_role(int(cargo_gestao_id))
+                if cargo_gestao and cargo_gestao in interaction.user.roles:
+                    is_gestao = True
+
+        if is_owner or is_admin or is_gestao:
+            return True
+
+        try:
+            db_user = supabase.table("membros_verificados").select("id_discord").eq("id_discord", str(interaction.user.id)).eq("id_servidor", str(interaction.guild_id)).execute()
+            if not db_user.data:
+                await interaction.response.send_message("⛔ **Acesso Negado!** Precisas de estar verificado (`/entrar`) para usar comandos.", ephemeral=True)
                 return False
+        except Exception as e:
+            print(f"🚨 Erro no global_check (membros): {e}")
+            return False
 
         return True
 

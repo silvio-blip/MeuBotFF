@@ -16,6 +16,40 @@ def log_sart(mensagem):
     print(f"[{agora}] ⚙️ [S.art] {mensagem}")
 
 
+async def notificar_admin_erro(guild: discord.Guild, dados_server: dict, titulo: str, descricao: str, usuario: discord.User = None, uid: str = None):
+    """Envia notificação de erro para o canal de logs ou DM ao dono do servidor."""
+    canal_id = dados_server.get("canal_id")
+    embed = discord.Embed(
+        title=f"🚨 {titulo}",
+        description=descricao,
+        color=discord.Color.red(),
+        timestamp=datetime.now()
+    )
+    if usuario:
+        embed.add_field(name="👤 Usuário", value=f"{usuario.mention} (`{usuario.id}`)", inline=True)
+    if uid:
+        embed.add_field(name="🆔 UID Free Fire", value=f"`{uid}`", inline=True)
+    embed.set_footer(text="S.art Engine • Notificação de Erro")
+
+    # Tenta enviar no canal de logs configurado
+    if canal_id and str(canal_id).isdigit():
+        canal = guild.get_channel(int(canal_id))
+        if canal:
+            try:
+                await canal.send(embed=embed)
+                return
+            except Exception:
+                pass
+
+    # Fallback: DM ao dono do servidor
+    try:
+        owner = guild.owner
+        if owner:
+            await owner.send(embed=embed)
+    except Exception:
+        pass
+
+
 IDIOMAS_FF = {
     1: "English", 3: "中文 (繁)", 4: "ไทย", 5: "Tiếng Việt",
     6: "Indonesia", 7: "Português", 8: "Español", 9: "Русский",
@@ -113,6 +147,12 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
             async with session.get(url, headers=headers) as resposta_api:
                 log_sart(f"🔎 /entrar - Status da API: {resposta_api.status}")
                 if resposta_api.status != 200:
+                    await notificar_admin_erro(
+                        interaction.guild, self.dados_server,
+                        "Erro de API no Registro",
+                        f"Falha ao conectar na API da Vercel (Status: {resposta_api.status})",
+                        interaction.user, uid
+                    )
                     return await interaction.followup.send("⚠️ Erro de conexão com a API da Vercel.")
                     
                 dados_iniciais = await resposta_api.json()
@@ -127,6 +167,12 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 
                 if not clan_id_raw:
                     log_sart(f"❌ /entrar - BLOQUEADO: clanInfo é null/vazio para {nickname}")
+                    await notificar_admin_erro(
+                        interaction.guild, self.dados_server,
+                        "Registro Bloqueado - Sem Guilda",
+                        f"O usuário tentou registrar mas a conta FF não possui guilda associada.",
+                        interaction.user, uid
+                    )
                     return await interaction.followup.send("❌ **Acesso Negado:** Esta conta não está associada a nenhuma guilda no Free Fire.", ephemeral=True)
                 clan_id = str(clan_id_raw)
                 idioma_atual_raw = dados_iniciais.get("socialInfo", {}).get("language")
@@ -136,6 +182,12 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
                 
                 if clan_id != guilda_oficial:
                     log_sart(f"❌ /entrar - BLOQUEADO: guilda diferente para {nickname}")
+                    await notificar_admin_erro(
+                        interaction.guild, self.dados_server,
+                        "Registro Bloqueado - Guilda Incorreta",
+                        f"O usuário tentou registrar mas está na guilda **{nome_guilda_usuario}** (ID: {clan_id}), diferente da guilda do servidor ({guilda_oficial}).",
+                        interaction.user, uid
+                    )
                     return await interaction.followup.send(f"❌ **Acesso Negado:** A conta `{nickname}` está na guilda `{nome_guilda_usuario}`, que não é a guilda deste servidor.", ephemeral=True)
                 
                 log_sart(f"✅ /entrar - GUILDA OK para {nickname}: {clan_id} == {guilda_oficial}")
@@ -174,6 +226,12 @@ class ModalDadosPessoais(discord.ui.Modal, title='Dados Pessoais'):
 
         except Exception as e:
                 log_sart(f"🚨 Erro ao iniciar verificação: {e}")
+                await notificar_admin_erro(
+                    interaction.guild, self.dados_server,
+                    "Erro Inesperado no Registro",
+                    f"Exceção não tratada ao iniciar verificação: `{type(e).__name__}: {e}`",
+                    interaction.user, uid
+                )
                 await interaction.followup.send("🚨 Erro ao iniciar a verificação. Tenta novamente.", ephemeral=True)
 
 
@@ -254,7 +312,7 @@ async def processar_radar(interaction: discord.Interaction, user: discord.Member
                 if db_user_check.data and db_user_check.data[0].get("log_message_id"):
                     old_log_id = db_user_check.data[0]["log_message_id"]
 
-                thumbnail_id = avatar_id or head_pic_id
+                thumbnail_id = head_pic_id or avatar_id
                 
                 embed_perfil = discord.Embed(
                     title="🚨 Registo S.art | Perfil Verificado",
@@ -307,6 +365,16 @@ async def processar_radar(interaction: discord.Interaction, user: discord.Member
                 supabase.table("membros_verificados").upsert(dados_membro).execute()
 
                 try:
+                    cfg_economia = supabase.table("economia_config").select("*").eq("guilda_id", str(guild.id)).execute()
+                    if cfg_economia.data and cfg_economia.data[0].get("habilitado"):
+                        moedas = cfg_economia.data[0].get("moedas_entrada", 10)
+                        db_user = supabase.table("membros_verificados").select("moedas").eq("id_discord", str(user.id)).eq("id_servidor", str(guild.id)).execute()
+                        saldo_atual = db_user.data[0]["moedas"] if db_user.data and db_user.data[0].get("moedas") is not None else 0
+                        supabase.table("membros_verificados").update({"moedas": saldo_atual + int(moedas)}).eq("id_discord", str(user.id)).eq("id_servidor", str(guild.id)).execute()
+                except Exception:
+                    pass
+
+                try:
                     await user.send(
                         f"✅ **Identidade Confirmada no servidor {guild.name}!**\n\nDetetei a mudança para `{nome_idioma_alvo}`. O teu cargo foi entregue com sucesso e os teus dados foram puxados para o nosso sistema! Bem-vindo à equipa **{jogador_nome}**.\n**Gênero:** {genero} | **Idade:** {idade} anos\n*(Já podes voltar a colocar o teu idioma normal no jogo)*",
                         embed=embed_perfil, 
@@ -333,8 +401,20 @@ async def processar_radar(interaction: discord.Interaction, user: discord.Member
 
             except discord.Forbidden:
                 log_sart(f"❌ O Discord bloqueou a entrega do cargo a {user.name}.")
+                await notificar_admin_erro(
+                    guild, dados_server,
+                    "Falha ao Entregar Cargo",
+                    f"O bot não tem permissão para atribuir o cargo de membro verificado a {user.mention}. Verifique a hierarquia de cargos.",
+                    user, uid
+                )
     else:
         log_sart(f"❌ TIMEOUT: O radar expirou para {user.name}.")
+        await notificar_admin_erro(
+            guild, dados_server,
+            "Timeout na Verificação",
+            f"O usuário não mudou o idioma da assinatura no Free Fire dentro de 5 minutos. O processo de verificação expirou.",
+            user, uid
+        )
         
         embed_tutorial.title = "❌ Tempo Esgotado!"
         embed_tutorial.description = f"Não consegui detetar a mudança para `{nome_idioma_alvo}` em 5 minutos. Tenta `/entrar` novamente."
@@ -481,7 +561,7 @@ class Usuarios(commands.Cog):
         except Exception:
             pass
 
-        thumbnail_id = avatar_id or head_pic_id
+        thumbnail_id = head_pic_id or avatar_id
 
         embed_perfil = discord.Embed(
             title="🚨 Registo S.art | Perfil Verificado",

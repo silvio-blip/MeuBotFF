@@ -20,7 +20,8 @@ def ler_sub(tabela, guild_id):
     try:
         db = supabase.table(tabela).select("*").eq("guilda_id", guild_id).execute()
         return db.data[0] if db.data else {}
-    except:
+    except Exception as e:
+        print(f"🚨 Economia ler_sub erro [{tabela}]: {e}")
         return {}
 
 def safe_role(guild, role_id):
@@ -28,16 +29,37 @@ def safe_role(guild, role_id):
         return guild.get_role(int(role_id))
     return None
 
+
+def tem_permissao_admin(interaction: discord.Interaction) -> bool:
+    if interaction.user.id == interaction.guild.owner_id:
+        return True
+    if interaction.user.guild_permissions.administrator:
+        return True
+    dados = supabase.table("servidores").select("cargo_gestao_id").eq("id_discord", str(interaction.guild_id)).execute()
+    if dados.data and dados.data[0].get("cargo_gestao_id"):
+        cargo_gestao_id = int(dados.data[0]["cargo_gestao_id"])
+        cargo_gestao = interaction.guild.get_role(cargo_gestao_id)
+        if cargo_gestao and cargo_gestao in interaction.user.roles:
+            return True
+    return False
+
 def safe_channel(guild, channel_id):
     if channel_id and str(channel_id).isdigit():
         return guild.get_channel(int(channel_id))
     return None
 
 def toggle_config(tabela, guild_id):
-    db = supabase.table(tabela).select("habilitado").eq("guilda_id", guild_id).execute()
+    try:
+        db = supabase.table(tabela).select("habilitado").eq("guilda_id", guild_id).execute()
+    except Exception as e:
+        print(f"🚨 Economia toggle_config erro: {e}")
+        return None
     if db.data:
         atual = db.data[0].get("habilitado", True)
-        supabase.table(tabela).update({"habilitado": not atual}).eq("guilda_id", guild_id).execute()
+        try:
+            supabase.table(tabela).update({"habilitado": not atual}).eq("guilda_id", guild_id).execute()
+        except Exception as e:
+            print(f"🚨 Economia toggle_config update erro: {e}")
         return not atual
     return None
 
@@ -61,6 +83,7 @@ class ViewMenuPrincipal(discord.ui.View):
             discord.SelectOption(label="Ranking", value="ranking", emoji="📊", description="Ranking dos membros"),
             discord.SelectOption(label="Estatísticas", value="stats", emoji="📊", description="Dados do servidor"),
             discord.SelectOption(label="Verificação Automática", value="verificacao", emoji="🔄", description="Remover cargo de quem saiu da guilda FF"),
+            discord.SelectOption(label="Economia", value="economia", emoji="💰", description="Moedas, recompensas e configurações"),
         ],
         custom_id="painel_menu_principal"
     )
@@ -77,27 +100,27 @@ class ViewBase(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Alterar Guilda FF", style=discord.ButtonStyle.danger, emoji="🛡️", custom_id="base_guilda")
+    @discord.ui.button(label="Alterar Guilda FF", style=discord.ButtonStyle.danger, emoji="🛡️", custom_id="base_guilda", row=1)
     async def btn_guilda(self, interaction, button):
         await interaction.response.defer(ephemeral=True)
         guild_id = str(interaction.guild_id)
         codigo = "".join(random.choices(string.ascii_letters + string.digits, k=20))
-        supabase.table("codigos_seguranca").insert({"codigo": codigo, "id_servidor": guild_id, "created_at": datetime.now(timezone.utc).isoformat()}).execute()
+        supabase.table("codigos_seguranca").insert({"codigo": codigo, "id_servidor": guild_id}).execute()
         try:
-            await interaction.user.send(embed=discord.Embed(title="🔐 Código de Segurança", description=f"Usa o código:\n\n```yaml\n{codigo}\n```\n*Expira em 5 minutos.*", color=discord.Color.red()))
+            await interaction.user.send(embed=discord.Embed(title="🔐 Código de Segurança", description=f"Usa o código:\n\n```yaml\n{codigo}\n```", color=discord.Color.red()))
             await interaction.followup.send("🔐 Código enviado para a tua DM!", view=ViewInserirCodigo(guild_id, interaction.client), ephemeral=True)
         except discord.Forbidden:
             await interaction.followup.send("❌ DMs fechadas!", ephemeral=True)
 
-    @discord.ui.button(label="Alterar Cargo de Membros", style=discord.ButtonStyle.secondary, emoji="🎖️", custom_id="base_cargo")
+    @discord.ui.button(label="Alterar Cargo de Membros", style=discord.ButtonStyle.secondary, emoji="🎖️", custom_id="base_cargo", row=1)
     async def btn_cargo(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o novo Cargo que os membros verificados recebem:**", view=SelectCargoComUpdate(str(interaction.guild_id), interaction.client, "base"), ephemeral=True)
 
-    @discord.ui.button(label="Alterar Canal de Logs", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="base_canal")
+    @discord.ui.button(label="Alterar Canal de Logs", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="base_canal", row=2)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot envia os registos:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "servidores", "canal_id", "base"), ephemeral=True)
 
-    @discord.ui.button(label="Alterar Cargo de Gestão", style=discord.ButtonStyle.primary, emoji="🛠️", custom_id="base_gestao")
+    @discord.ui.button(label="Alterar Cargo de Gestão", style=discord.ButtonStyle.primary, emoji="🛠️", custom_id="base_gestao", row=2)
     async def btn_gestao(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Cargo que os moderadores recebem:**", view=SelectCargoGestaoComUpdate(str(interaction.guild_id), interaction.client, "base"), ephemeral=True)
 
@@ -110,15 +133,15 @@ class ViewWarns(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Configurar Limites de Warns", style=discord.ButtonStyle.secondary, emoji="⚙️", custom_id="warns_config")
+    @discord.ui.button(label="Configurar Limites", style=discord.ButtonStyle.secondary, emoji="⚙️", custom_id="warns_config", row=1)
     async def btn_config(self, interaction, button):
         await interaction.response.send_modal(ModalConfigWarns(str(interaction.guild_id), interaction.client))
 
-    @discord.ui.button(label="Definir Canal de Notificações", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="warns_canal")
+    @discord.ui.button(label="Canal de Notificações", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="warns_canal", row=1)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa quando alguém leva warn:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "warns_config", "canal_notificacoes", "warns"), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar Warns", style=discord.ButtonStyle.success, emoji="🔄", custom_id="warns_toggle")
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="warns_toggle", row=2)
     async def btn_toggle(self, interaction, button):
         toggle_config("warns_config", str(interaction.guild_id))
         embed, view = build_categoria(interaction.guild, "warns")
@@ -133,15 +156,15 @@ class ViewBV(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Personalizar Mensagem de Boas-Vindas", style=discord.ButtonStyle.secondary, emoji="✏️", custom_id="bv_config")
+    @discord.ui.button(label="Personalizar Mensagem", style=discord.ButtonStyle.secondary, emoji="✏️", custom_id="bv_config", row=1)
     async def btn_config(self, interaction, button):
         await interaction.response.send_modal(ModalBoasVindas(str(interaction.guild_id), interaction.client))
 
-    @discord.ui.button(label="Definir Canal de Boas-Vindas", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="bv_canal")
+    @discord.ui.button(label="Definir Canal", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="bv_canal", row=1)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde a mensagem de boas-vindas é enviada:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "boas_vindas_config", "canal_id", "boas_vindas"), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar Boas-Vindas", style=discord.ButtonStyle.success, emoji="🔄", custom_id="bv_toggle")
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="bv_toggle", row=2)
     async def btn_toggle(self, interaction, button):
         toggle_config("boas_vindas_config", str(interaction.guild_id))
         embed, view = build_categoria(interaction.guild, "boas_vindas")
@@ -156,15 +179,15 @@ class ViewRaid(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Configurar Limites de Proteção", style=discord.ButtonStyle.danger, emoji="⚙️", custom_id="raid_config")
+    @discord.ui.button(label="Configurar Limites", style=discord.ButtonStyle.danger, emoji="⚙️", custom_id="raid_config", row=1)
     async def btn_config(self, interaction, button):
         await interaction.response.send_modal(ModalAntiRaid(str(interaction.guild_id), interaction.client))
 
-    @discord.ui.button(label="Definir Canal de Alertas", style=discord.ButtonStyle.secondary, emoji="🚨", custom_id="raid_canal")
+    @discord.ui.button(label="Definir Canal de Alertas", style=discord.ButtonStyle.secondary, emoji="🚨", custom_id="raid_canal", row=1)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa quando detecta raid:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "anti_raid_config", "canal_alertas", "anti_raid"), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar Anti-Raid", style=discord.ButtonStyle.success, emoji="🔄", custom_id="raid_toggle")
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="raid_toggle", row=2)
     async def btn_toggle(self, interaction, button):
         toggle_config("anti_raid_config", str(interaction.guild_id))
         embed, view = build_categoria(interaction.guild, "anti_raid")
@@ -179,19 +202,19 @@ class ViewNoti(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Canal de Atualizações do Jogo", style=discord.ButtonStyle.secondary, emoji="🔄", custom_id="noti_atual")
+    @discord.ui.button(label="Canal Atualizações", style=discord.ButtonStyle.secondary, emoji="🔄", custom_id="noti_atual", row=1)
     async def btn_atual(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa sobre atualizações do Free Fire:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_atualizacoes", "notificacoes"), ephemeral=True)
 
-    @discord.ui.button(label="Canal de Membros que Saíram", style=discord.ButtonStyle.secondary, emoji="👤", custom_id="noti_membros")
+    @discord.ui.button(label="Canal Membros Saíram", style=discord.ButtonStyle.secondary, emoji="👤", custom_id="noti_membros", row=1)
     async def btn_membros(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa quando um membro sai da guilda FF:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_membros", "notificacoes"), ephemeral=True)
 
-    @discord.ui.button(label="Canal de Temporada", style=discord.ButtonStyle.secondary, emoji="📅", custom_id="noti_temp")
+    @discord.ui.button(label="Canal Temporada", style=discord.ButtonStyle.secondary, emoji="📅", custom_id="noti_temp", row=2)
     async def btn_temp(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa sobre mudanças de temporada:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_temporada", "notificacoes"), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar Notificações", style=discord.ButtonStyle.success, emoji="🔄", custom_id="noti_toggle")
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="noti_toggle", row=2)
     async def btn_toggle(self, interaction, button):
         toggle_config("notificacoes_config", str(interaction.guild_id))
         embed, view = build_categoria(interaction.guild, "notificacoes")
@@ -206,7 +229,7 @@ class ViewTorneios(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Definir Canal de Vitórias", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="torneios_canal_vitorias")
+    @discord.ui.button(label="Definir Canal de Vitórias", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="torneios_canal_vitorias", row=1)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde as vitórias dos torneios são anunciadas:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "torneios_config", "canal_vitorias", "torneios"), ephemeral=True)
 
@@ -219,17 +242,17 @@ class ViewVerificacao(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Definir Canal de Verificação", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="verificacao_canal")
+    @discord.ui.button(label="Definir Canal", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="verificacao_canal", row=1)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa sobre remoções de cargo:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "verificacao_automatica_config", "canal_verificacao_id", "verificacao"), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar Verificação", style=discord.ButtonStyle.success, emoji="🔄", custom_id="verificacao_toggle")
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="verificacao_toggle", row=1)
     async def btn_toggle(self, interaction, button):
         toggle_config("verificacao_automatica_config", str(interaction.guild_id))
         embed, view = build_categoria(interaction.guild, "verificacao")
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="Verificar Agora", style=discord.ButtonStyle.danger, emoji="⚡", custom_id="verificacao_manual")
+    @discord.ui.button(label="Verificar Agora", style=discord.ButtonStyle.danger, emoji="⚡", custom_id="verificacao_manual", row=2)
     async def btn_manual(self, interaction, button):
         await interaction.response.defer(ephemeral=True)
         guild_id = str(interaction.guild_id)
@@ -272,6 +295,33 @@ class ViewVerificacao(discord.ui.View):
         texto = "\n".join(f"• {nome}" for nome in removidos) if removidos else "Nenhum membro removido."
         await interaction.followup.send(f"✅ Verificação manual concluída.\n**Removidos:**\n{texto}", ephemeral=True)
 
+class ViewEconomia(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.select(placeholder="📂 Voltar ao menu principal...", options=[discord.SelectOption(label="Menu Principal", value="main", emoji="📋")], custom_id="economia_back")
+    async def back(self, interaction, select):
+        embed, view = build_categoria(interaction.guild, "main")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Configurar Recompensas", style=discord.ButtonStyle.secondary, emoji="⚙️", custom_id="economia_config_recompensas", row=1)
+    async def btn_config_recompensas(self, interaction, button):
+        await interaction.response.send_modal(ModalConfigEconomiaRecompensas(str(interaction.guild_id), interaction.client))
+
+    @discord.ui.button(label="Configurar Daily/Limite", style=discord.ButtonStyle.secondary, emoji="📅", custom_id="economia_config_daily", row=1)
+    async def btn_config_daily(self, interaction, button):
+        await interaction.response.send_modal(ModalConfigEconomiaDaily(str(interaction.guild_id), interaction.client))
+
+    @discord.ui.button(label="Nome da Moeda", style=discord.ButtonStyle.secondary, emoji="🏷️", custom_id="economia_config_nome", row=2)
+    async def btn_config_nome(self, interaction, button):
+        await interaction.response.send_modal(ModalConfigEconomiaNome(str(interaction.guild_id), interaction.client))
+
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="economia_toggle", row=2)
+    async def btn_toggle(self, interaction, button):
+        toggle_config("economia_config", str(interaction.guild_id))
+        embed, view = build_categoria(interaction.guild, "economia")
+        await interaction.response.edit_message(embed=embed, view=view)
+
 def build_categoria(guild, cat):
     guild_id = str(guild.id)
     dados = ler_config(guild_id)
@@ -292,26 +342,48 @@ def build_categoria(guild, cat):
     member_count = len(db_members.data) if db_members.data else 0
 
     if cat == "main":
-        embed = discord.Embed(title="⚙️ Painel de Controlo S.art", description="Bem-vindo ao painel de administração!\nSelecciona uma categoria no menu abaixo para configurar.", color=discord.Color.from_rgb(43, 45, 49))
-        embed.add_field(name="🛡️ Configuração Base", value="Guilda, Cargo, Canal, Gestão", inline=True)
-        embed.add_field(name="⚠️ Warns", value=on_off(warns_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="👋 Boas-Vindas", value=on_off(bv_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="🛡️ Anti-Raid", value=on_off(raid_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="🔔 Notificações", value=on_off(noti_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="📊 Stats", value=f"{member_count} verificados", inline=True)
-        embed.set_footer(text="Usa o menu acima para navegar entre categorias")
+        embed = discord.Embed(
+            title="⚙️ Painel de Controlo S.art",
+            description=(
+                "Bem-vindo ao **painel de administração**!\n"
+                "Seleciona uma categoria no menu abaixo para configurar.\n\n"
+                "Aqui encontras todas as ferramentas para gerir o servidor."
+            ),
+            color=discord.Color.from_rgb(88, 101, 242)
+        )
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        
+        status_fields = [
+            ("🛡️ Configuração Base", f"{'✅' if dados else '⚠️'} Guilda: `{id_guilda}`\n📋 **Cargo:** {cargo_atual.mention if cargo_atual else '⚠️ Não definido'}\n📢 **Canal:** {canal_atual.mention if canal_atual else '⚠️ Não definido'}", False),
+            ("⚠️ Warns", f"**Status:** {on_off(warns_cfg.get('habilitado', False))}\n📊 Limite: `{warns_cfg.get('max_warns', 3)}` warns\n⏰ Expira em: `{warns_cfg.get('dias_expiracao', 30)}` dias", True),
+            ("👋 Boas-Vindas", f"**Status:** {on_off(bv_cfg.get('habilitado', False))}\n📢 Canal: {safe_channel(guild, bv_cfg.get('canal_id')).mention if safe_channel(guild, bv_cfg.get('canal_id')) else '⚠️ Não definido'}", True),
+            ("🛡️ Anti-Raid", f"**Status:** {on_off(raid_cfg.get('habilitado', False))}\n📊 Limite: `{raid_cfg.get('limite_joins', 5)}` joins/min\n⏱️ Lock: `{raid_cfg.get('duracao_lock', 5)}` min", True),
+            ("🔔 Notificações", f"**Status:** {on_off(noti_cfg.get('habilitado', False))}\n🎮 FF News, 👤 Saídas, 📅 Temporada", True),
+            ("📊 Estatísticas", f"**👥 Verificados:** `{member_count}` membros\n🏆 Ranking ativo\n🔄 Verificação automática", True),
+        ]
+        
+        for name, value, inline in status_fields:
+            embed.add_field(name=name, value=value, inline=inline)
+        
+        embed.set_footer(text="🔄 Usa o menu acima para navegar entre categorias")
         return embed, ViewMenuPrincipal()
 
     elif cat == "base":
-        embed = discord.Embed(title="🛡️ Configuração Base", description="Configurações principais do servidor.\nCada botão permite alterar uma configuração.", color=discord.Color.from_rgb(255, 50, 50))
-        embed.add_field(name="Guilda FF", value=f"`{id_guilda}`", inline=True)
-        embed.add_field(name="Cargo Membro", value=cargo_atual.mention if cargo_atual else "⚠️ Não definido", inline=True)
-        embed.add_field(name="Canal Logs", value=canal_atual.mention if canal_atual else "⚠️ Não definido", inline=True)
-        embed.add_field(name="Cargo Gestão", value=cargo_gestao.mention if cargo_gestao else "⚠️ Não definido", inline=True)
-        embed.add_field(name="Servidor", value=guild.name, inline=True)
-        embed.add_field(name="Verificados", value=f"{member_count} membros", inline=True)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n🛡️ **Alterar Guilda** — Muda o ID da guilda FF\n🎖️ **Alterar Cargo** — Muda o cargo dos membros\n📢 **Alterar Canal** — Muda o canal de logs\n🛠️ **Cargo Gestão** — Muda o cargo dos mods", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="🛡️ Configuração Base",
+            description="Configurações principais do servidor.\nCada botão permite alterar uma configuração.",
+            color=discord.Color.from_rgb(88, 101, 242)
+        )
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="🛡️ Guilda FF", value=f"`{id_guilda}`", inline=True)
+        embed.add_field(name="🎖️ Cargo Membro", value=cargo_atual.mention if cargo_atual else "⚠️ Não definido", inline=True)
+        embed.add_field(name="📢 Canal Logs", value=canal_atual.mention if canal_atual else "⚠️ Não definido", inline=True)
+        embed.add_field(name="🛠️ Cargo Gestão", value=cargo_gestao.mention if cargo_gestao else "⚠️ Não definido", inline=True)
+        embed.add_field(name="👥 Verificados", value=f"`{member_count}` membros", inline=True)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🛡️ **Alterar Guilda** — Muda o ID da guilda FF\n🎖️ **Alterar Cargo** — Muda o cargo dos membros\n📢 **Alterar Canal** — Muda o canal de logs\n🛠️ **Cargo Gestão** — Muda o cargo dos mods", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewBase()
 
     elif cat == "warns":
@@ -319,25 +391,40 @@ def build_categoria(guild, cat):
         mw = warns_cfg.get("max_warns", 3)
         de = warns_cfg.get("dias_expiracao", 30)
         canal_warns = safe_channel(guild, warns_cfg.get("canal_notificacoes"))
-        embed = discord.Embed(title="⚠️ Sistema de Warns", description="Sistema de advertências.\nQuando um membro faz algo errado, o admin dá um warn.\nCom X warns, leva ban automático.", color=discord.Color.from_rgb(255, 165, 0))
-        embed.add_field(name="Status", value=on_off(warns_on), inline=True)
-        embed.add_field(name="Limite", value=f"{mw} strikes = ban", inline=True)
-        embed.add_field(name="Expiração", value=f"{de} dias", inline=True)
-        embed.add_field(name="Canal Notificações", value=canal_warns.mention if canal_warns else "⚠️ Não definido", inline=True)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n⚙️ **Configurar Limites** — Muda o máximo de warns e dias\n📢 **Definir Canal** — Onde o bot avisa dos warns\n🔄 **Ligar/Desligar** — Ativa ou desativa o sistema", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="⚠️ Sistema de Warns",
+            description="Sistema de advertências.\nQuando um membro faz algo errado, o admin dá um warn.\nCom X warns, leva ban automático.",
+            color=discord.Color.from_rgb(255, 140, 0)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/1036/1036552.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(warns_on), inline=True)
+        embed.add_field(name="🔢 Limite", value=f"`{mw}` strikes = ban", inline=True)
+        embed.add_field(name="⏰ Expiração", value=f"`{de}` dias", inline=True)
+        embed.add_field(name="📢 Canal Notificações", value=canal_warns.mention if canal_warns else "⚠️ Não definido", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n⚙️ **Configurar Limites** — Muda o máximo de warns e dias\n📢 **Definir Canal** — Onde o bot avisa dos warns\n🔄 **Ligar/Desligar** — Ativa ou desativa o sistema", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewWarns()
 
     elif cat == "boas_vindas":
         bv_on = bv_cfg.get("habilitado", False)
         bv_canal = safe_channel(guild, bv_cfg.get("canal_id"))
-        embed = discord.Embed(title="👋 Boas-Vindas", description="Envia uma embed automática quando novos membros entram.\nPersonaliza o título, descrição e cor.", color=discord.Color.from_rgb(0, 200, 255))
-        embed.add_field(name="Status", value=on_off(bv_on), inline=True)
-        embed.add_field(name="Canal", value=bv_canal.mention if bv_canal else "⚠️ Não definido", inline=True)
-        embed.add_field(name="Título", value=bv_cfg.get("titulo", "—"), inline=True)
-        embed.add_field(name="Descrição", value=bv_cfg.get("descricao", "—")[:100], inline=False)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n✏️ **Personalizar Mensagem** — Muda título, descrição e cor\n📢 **Definir Canal** — Onde a mensagem é enviada\n🔄 **Ligar/Desligar** — Ativa ou desativa o sistema\n\n**Variáveis:** {user} = menção, {membros} = total", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="👋 Boas-Vindas",
+            description="Envia uma embed automática quando novos membros entram.\nPersonaliza o título, descrição e cor.",
+            color=discord.Color.from_rgb(0, 200, 255)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2583/2583344.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(bv_on), inline=True)
+        embed.add_field(name="📢 Canal", value=bv_canal.mention if bv_canal else "⚠️ Não definido", inline=True)
+        embed.add_field(name="📝 Título", value=bv_cfg.get("titulo", "—"), inline=False)
+        descricao_curta = bv_cfg.get("descricao", "—")
+        if len(descricao_curta) > 150:
+            descricao_curta = descricao_curta[:150] + "..."
+        embed.add_field(name="📄 Descrição", value=descricao_curta, inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n✏️ **Personalizar Mensagem** — Muda título, descrição e cor\n📢 **Definir Canal** — Onde a mensagem é enviada\n🔄 **Ligar/Desligar** — Ativa ou desativa o sistema\n\n**Variáveis:** `{user}` = menção, `{membros}` = total", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewBV()
 
     elif cat == "anti_raid":
@@ -345,13 +432,19 @@ def build_categoria(guild, cat):
         rl = raid_cfg.get("limite_joins", 5)
         dl = raid_cfg.get("duracao_lock", 5)
         canal_raid = safe_channel(guild, raid_cfg.get("canal_alertas"))
-        embed = discord.Embed(title="🛡️ Anti-Raid", description="Protege o servidor contra ataques de raid.\nSe muitos membros entrarem ao mesmo tempo, o bot bloqueia o servidor.", color=discord.Color.from_rgb(200, 30, 30))
-        embed.add_field(name="Status", value=on_off(raid_on), inline=True)
-        embed.add_field(name="Limite", value=f"{rl} joins/min", inline=True)
-        embed.add_field(name="Lock", value=f"{dl} minutos", inline=True)
-        embed.add_field(name="Canal Alertas", value=canal_raid.mention if canal_raid else "⚠️ Não definido", inline=True)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n⚙️ **Configurar Limites** — Muda o máximo de joins e duração\n🚨 **Definir Canal** — Onde o bot avisa de raids\n🔄 **Ligar/Desligar** — Ativa ou desativa a proteção", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="🛡️ Anti-Raid",
+            description="Protege o servidor contra ataques de raid.\nSe muitos membros entrarem ao mesmo tempo, o bot bloqueia o servidor.",
+            color=discord.Color.from_rgb(255, 50, 50)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/1063/1063372.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(raid_on), inline=True)
+        embed.add_field(name="🔢 Limite", value=f"`{rl}` joins/min", inline=True)
+        embed.add_field(name="⏱️ Lock", value=f"`{dl}` minutos", inline=True)
+        embed.add_field(name="🚨 Canal Alertas", value=canal_raid.mention if canal_raid else "⚠️ Não definido", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n⚙️ **Configurar Limites** — Muda o máximo de joins e duração\n🚨 **Definir Canal** — Onde o bot avisa de raids\n🔄 **Ligar/Desligar** — Ativa ou desativa a proteção", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewRaid()
 
     elif cat == "notificacoes":
@@ -359,13 +452,19 @@ def build_categoria(guild, cat):
         noti_atual = safe_channel(guild, noti_cfg.get('canal_atualizacoes'))
         noti_membros = safe_channel(guild, noti_cfg.get('canal_membros'))
         noti_temp = safe_channel(guild, noti_cfg.get('canal_temporada'))
-        embed = discord.Embed(title="🔔 Notificações", description="Alertas automáticos sobre o Free Fire.\nO bot verifica e avisa sobre mudanças.", color=discord.Color.from_rgb(150, 100, 255))
-        embed.add_field(name="Status", value=on_off(noti_on), inline=True)
-        embed.add_field(name="Atualizações", value=noti_atual.mention if noti_atual else "❌ Não definido", inline=True)
-        embed.add_field(name="Membros", value=noti_membros.mention if noti_membros else "❌ Não definido", inline=True)
-        embed.add_field(name="Temporada", value=noti_temp.mention if noti_temp else "❌ Não definido", inline=True)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n🔄 **Atualizações** — Canal para news do jogo\n👤 **Membros** — Canal para quem saiu da guilda\n📅 **Temporada** — Canal para mudanças de rank\n🔄 **Ligar/Desligar** — Ativa ou desativa as notificações", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="🔔 Notificações",
+            description="Alertas automáticos sobre o Free Fire.\nO bot verifica e avisa sobre mudanças.",
+            color=discord.Color.from_rgb(150, 100, 255)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/906/906334.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(noti_on), inline=True)
+        embed.add_field(name="🎮 Canal Atualizações", value=noti_atual.mention if noti_atual else "❌ Não definido", inline=False)
+        embed.add_field(name="👤 Canal Membros Saíram", value=noti_membros.mention if noti_membros else "❌ Não definido", inline=False)
+        embed.add_field(name="📅 Canal Temporada", value=noti_temp.mention if noti_temp else "❌ Não definido", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🔄 **Atualizações** — Canal para news do jogo\n👤 **Membros** — Canal para quem saiu da guilda\n📅 **Temporada** — Canal para mudanças de rank\n🔄 **Ligar/Desligar** — Ativa ou desativa as notificações", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewNoti()
 
     elif cat == "torneios":
@@ -382,61 +481,106 @@ def build_categoria(guild, cat):
         except Exception:
             pass
         
-        embed = discord.Embed(title="🏆 Sistema de Torneios", description="Gerencia torneios da guilda.\nUsa os comandos slash para criar e gerir.", color=discord.Color.from_rgb(255, 215, 0))
-        embed.add_field(name="Torneios Ativos", value=f"**{torneios_ativos}**", inline=True)
-        embed.add_field(name="Canal de Vitórias", value=canal_vitorias_text, inline=True)
-        embed.add_field(name="Comandos Admin", value=(
-            "`/torneio_criar` — Criar (Solo/Duo/Trio/Squad)\n"
-            "`/torneio_iniciar id` — Iniciar\n"
-            "`/torneio_resultado id @venc` — Resultado\n"
-            "`/torneio_finalizar id` — Finalizar"
-        ), inline=True)
-        embed.add_field(name="Comandos Membros", value=(
-            "`/torneio_equipa_criar id nome @m1...` — Criar equipa\n"
-            "`/torneio_equipa_ver id` — Ver equipas"
-        ), inline=True)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ao finalizar:** DM ao campeão + mensagem no canal + dados eliminados", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="🏆 Sistema de Torneios",
+            description="Gerencia torneios da guilda.\nUsa os comandos slash para criar e gerir.",
+            color=discord.Color.from_rgb(255, 215, 0)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2583/2583307.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="🏆 Torneios Ativos", value=f"**{torneios_ativos}**", inline=True)
+        embed.add_field(name="📢 Canal de Vitórias", value=canal_vitorias_text, inline=True)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Comandos Admin:**\n`/torneio_criar` — Criar (Solo/Duo/Trio/Squad)\n`/torneio_iniciar id` — Iniciar\n`/torneio_resultado id @venc` — Resultado\n`/torneio_finalizar id` — Finalizar\n\n**Comandos Membros:**\n`/torneio_equipa_criar id nome @m1...` — Criar equipa\n`/torneio_equipa_ver id` — Ver equipas", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**ℹ️ Ao finalizar:** DM ao campeão + mensagem no canal + dados eliminados", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewTorneios()
 
     elif cat == "ranking":
         db_cache = supabase.table("ranking_cache").select("*").eq("guilda_id", guild_id).order("ranking_points", desc=True).limit(5).execute()
         cache_count = len(db_cache.data) if db_cache.data else 0
-        embed = discord.Embed(title="📊 Ranking da Guilda", description="Ranking dos membros por pontos Battle Royale.\nUsa os comandos slash para ver o ranking completo.", color=discord.Color.from_rgb(255, 215, 0))
-        embed.add_field(name="Membros no Ranking", value=f"**{cache_count}**", inline=True)
-        embed.add_field(name="Comandos", value="**Membros:**\n`/ranking_guilda` — Top 10\n`/meu_ranking` — Tua posição\n\n**Admin:**\n`/atualizar_ranking` — Forçar update", inline=False)
+        embed = discord.Embed(
+            title="📊 Ranking da Guilda",
+            description="Ranking dos membros por pontos Battle Royale.\nUsa os comandos slash para ver o ranking completo.",
+            color=discord.Color.from_rgb(255, 215, 0)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2583/2583307.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="👥 Membros no Ranking", value=f"**{cache_count}**", inline=True)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Comandos Membros:**\n`/ranking_guilda` — Ver top 10\n`/meu_ranking` — Tua posição\n\n**Comandos Admin:**\n`/atualizar_ranking` — Forçar update do ranking", inline=False)
         if db_cache.data:
             top_text = ""
             for i, r in enumerate(db_cache.data[:5], 1):
                 membro = guild.get_member(int(r["usuario_id"]))
                 nome = membro.display_name if membro else "—"
                 top_text += f"**{i}.** {nome} — **{r.get('ranking_points', 0)}** pts\n"
-            embed.add_field(name="Top 5", value=top_text, inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+            embed.add_field(name="🥇 Top 5", value=top_text, inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewMenuPrincipal()
 
     elif cat == "stats":
-        embed = discord.Embed(title="📊 Estatísticas do Servidor", description="Dados gerais do servidor e do bot.", color=discord.Color.from_rgb(80, 80, 80))
-        embed.add_field(name="Membros Verificados", value=f"**{member_count}**", inline=True)
-        embed.add_field(name="Servidor", value=guild.name, inline=True)
-        embed.add_field(name="Guilda FF", value=f"`{id_guilda}`", inline=True)
-        embed.add_field(name="Warns", value=on_off(warns_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="Boas-Vindas", value=on_off(bv_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="Anti-Raid", value=on_off(raid_cfg.get("habilitado", False)), inline=True)
-        embed.add_field(name="Notificações", value=on_off(noti_cfg.get("habilitado", False)), inline=True)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="📊 Estatísticas do Servidor",
+            description="Dados gerais do servidor e do bot.",
+            color=discord.Color.from_rgb(88, 101, 242)
+        )
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="👥 Membros Verificados", value=f"**{member_count}**", inline=True)
+        embed.add_field(name="🏛️ Servidor", value=guild.name, inline=True)
+        embed.add_field(name="🛡️ Guilda FF", value=f"`{id_guilda}`", inline=True)
+        embed.add_field(name="⚠️ Warns", value=on_off(warns_cfg.get("habilitado", False)), inline=True)
+        embed.add_field(name="👋 Boas-Vindas", value=on_off(bv_cfg.get("habilitado", False)), inline=True)
+        embed.add_field(name="🛡️ Anti-Raid", value=on_off(raid_cfg.get("habilitado", False)), inline=True)
+        embed.add_field(name="🔔 Notificações", value=on_off(noti_cfg.get("habilitado", False)), inline=True)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewMenuPrincipal()
 
     elif cat == "verificacao":
         ver_cfg = ler_sub("verificacao_automatica_config", guild_id)
         ver_on = ver_cfg.get("habilitado", False)
         canal_ver = safe_channel(guild, ver_cfg.get("canal_verificacao_id"))
-        embed = discord.Embed(title="🔄 Verificação Automática", description="Remove automaticamente o cargo de registro de quem saiu da guilda FF.\nRoda a cada 24h (horário de Portugal).", color=discord.Color.from_rgb(0, 200, 150))
-        embed.add_field(name="Status", value=on_off(ver_on), inline=True)
-        embed.add_field(name="Canal de Logs", value=canal_ver.mention if canal_ver else "⚠️ Não definido", inline=True)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Botões:**\n📢 **Definir Canal** — Onde o bot avisa das remoções\n🔄 **Ligar/Desligar** — Ativa ou desativa a verificação\n⚡ **Verificar Agora** — Roda a verificação manualmente", inline=False)
-        embed.set_footer(text="Usa o menu abaixo para voltar")
+        embed = discord.Embed(
+            title="🔄 Verificação Automática",
+            description="Remove automaticamente o cargo de registro de quem saiu da guilda FF.\nRoda a cada 24h (horário de Portugal).",
+            color=discord.Color.from_rgb(0, 200, 150)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/2583/2583297.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(ver_on), inline=True)
+        embed.add_field(name="📢 Canal de Logs", value=canal_ver.mention if canal_ver else "⚠️ Não definido", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n📢 **Definir Canal** — Onde o bot avisa das remoções\n🔄 **Ligar/Desligar** — Ativa ou desativa a verificação\n⚡ **Verificar Agora** — Roda a verificação manualmente", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewVerificacao()
+
+    elif cat == "economia":
+        cfg = ler_sub("economia_config", guild_id)
+        on = cfg.get("habilitado", True)
+        entrada = cfg.get("moedas_entrada", 10)
+        convite = cfg.get("moedas_convite", 15)
+        tp = cfg.get("moedas_torneio_participar", 20)
+        tv = cfg.get("moedas_torneio_vencer", 100)
+        daily_min = cfg.get("moedas_daily_min", 5)
+        daily_max = cfg.get("moedas_daily_max", 15)
+        nome_moeda = cfg.get("nome_moeda", "moedas")
+        embed = discord.Embed(
+            title="💰 Economia do Servidor",
+            description="Configura as recompensas e limites do sistema de moedas.",
+            color=discord.Color.from_rgb(255, 215, 0)
+        )
+        embed.set_thumbnail(url="https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/1446515346201776283_1774.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(on), inline=True)
+        embed.add_field(name="🏷️ Nome da Moeda", value=f"`{nome_moeda}`", inline=True)
+        embed.add_field(name="🎁 Recompensas", value=(
+            f"**Entrada:** `{entrada}` {nome_moeda}\n"
+            f"**Convite:** `{convite}` {nome_moeda}\n"
+            f"**Participar Torneio:** `{tp}` {nome_moeda}\n"
+            f"**Vencer Torneio:** `{tv}` {nome_moeda}\n"
+            f"**Daily:** `{daily_min}`-`{daily_max}` {nome_moeda}"
+        ), inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🔄 **Ligar/Desligar** — Ativa ou desativa a economia\n⚙️ **Configurar Recompensas** — Muda valores por ação\n📅 **Configurar Daily/Limite** — Muda valor do daily\n🏷️ **Nome da Moeda** — Altera o nome exibido", inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
+        return embed, ViewEconomia()
 
     embed, view = build_categoria(guild, "main")
     return embed, view
@@ -458,16 +602,7 @@ class ModalNovaGuilda(discord.ui.Modal, title='Alterar Guilda FF'):
             return await interaction.followup.send("❌ ID Inválido!")
         db = supabase.table("codigos_seguranca").select("*").eq("codigo", codigo).eq("id_servidor", self._guild_id).execute()
         if not db.data:
-            return await interaction.followup.send("❌ Código inválido ou expirado.")
-        item = db.data[0]
-        if item.get("created_at"):
-            try:
-                criado = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
-                if (datetime.now(timezone.utc) - criado).total_seconds() > 300:
-                    supabase.table("codigos_seguranca").delete().eq("codigo", codigo).execute()
-                    return await interaction.followup.send("❌ Código expirado.")
-            except:
-                pass
+            return await interaction.followup.send("❌ Código inválido.", ephemeral=True)
         supabase.table("servidores").update({"id_guilda_ff": novo_id}).eq("id_discord", self._guild_id).execute()
         supabase.table("codigos_seguranca").delete().eq("codigo", codigo).execute()
         guild = self._bot.get_guild(int(self._guild_id))
@@ -537,6 +672,121 @@ class ModalAntiRaid(discord.ui.Modal, title='Configurar Limites de Anti-Raid'):
         if guild:
             embed, view = build_categoria(guild, "anti_raid")
             await interaction.response.edit_message(embed=embed, view=view)
+
+class ModalConfigEconomiaRecompensas(discord.ui.Modal, title='Configurar Recompensas'):
+    moedas_entrada = discord.ui.TextInput(label='Moedas por Verificação (/entrar)', placeholder='Ex: 10', default="10", required=True)
+    moedas_convite = discord.ui.TextInput(label='Moedas por Convite', placeholder='Ex: 15', default="15", required=True)
+    moedas_torneio_participar = discord.ui.TextInput(label='Moedas por Participar Torneio', placeholder='Ex: 20', default="20", required=True)
+    moedas_torneio_vencer = discord.ui.TextInput(label='Moedas por Vencer Torneio', placeholder='Ex: 100', default="100", required=True)
+
+    def __init__(self, guild_id, bot):
+        super().__init__()
+        self._guild_id = guild_id
+        self._bot = bot
+
+    async def on_submit(self, interaction):
+        try:
+            valores = {
+                "guilda_id": self._guild_id,
+                "moedas_entrada": int(self.moedas_entrada.value),
+                "moedas_convite": int(self.moedas_convite.value),
+                "moedas_torneio_participar": int(self.moedas_torneio_participar.value),
+                "moedas_torneio_vencer": int(self.moedas_torneio_vencer.value),
+                "habilitado": True
+            }
+        except ValueError:
+            return await interaction.response.send_message("❌ Valores inválidos! Usa apenas números.", ephemeral=True)
+        supabase.table("economia_config").upsert(valores).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "economia")
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ModalConfigEconomiaDaily(discord.ui.Modal, title='Configurar Daily'):
+    moedas_daily_min = discord.ui.TextInput(label='Mínimo de moedas por Daily', placeholder='Ex: 5', default="5", required=True)
+    moedas_daily_max = discord.ui.TextInput(label='Máximo de moedas por Daily', placeholder='Ex: 15', default="15", required=True)
+
+    def __init__(self, guild_id, bot):
+        super().__init__()
+        self._guild_id = guild_id
+        self._bot = bot
+
+    async def on_submit(self, interaction):
+        try:
+            valores = {
+                "guilda_id": self._guild_id,
+                "moedas_daily_min": int(self.moedas_daily_min.value),
+                "moedas_daily_max": int(self.moedas_daily_max.value)
+            }
+        except ValueError:
+            return await interaction.response.send_message("❌ Valores inválidos! Usa apenas números.", ephemeral=True)
+        db = supabase.table("economia_config").select("*").eq("guilda_id", self._guild_id).execute()
+        if db.data:
+            supabase.table("economia_config").update(valores).eq("guilda_id", self._guild_id).execute()
+        else:
+            valores["habilitado"] = True
+            valores.setdefault("moedas_entrada", 10)
+            valores.setdefault("moedas_convite", 15)
+            valores.setdefault("moedas_torneio_participar", 20)
+            valores.setdefault("moedas_torneio_vencer", 100)
+            valores.setdefault("moedas_daily", 10)
+            supabase.table("economia_config").upsert(valores).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "economia")
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ModalConfigEconomiaNome(discord.ui.Modal, title='Configurar Nome da Moeda'):
+    nome_moeda = discord.ui.TextInput(label='Nome da Moeda', placeholder='Ex: Rubis, Créditos, Gold', default="moedas", required=True, max_length=30)
+
+    def __init__(self, guild_id, bot):
+        super().__init__()
+        self._guild_id = guild_id
+        self._bot = bot
+        try:
+            db = supabase.table("economia_config").select("nome_moeda").eq("guilda_id", str(guild_id)).execute()
+            if db.data and db.data[0].get("nome_moeda"):
+                self.nome_moeda.default = db.data[0]["nome_moeda"]
+        except Exception:
+            pass
+
+    async def on_submit(self, interaction):
+        valores = {
+            "guilda_id": self._guild_id,
+            "nome_moeda": self.nome_moeda.value.strip()
+        }
+        try:
+            db = supabase.table("economia_config").select("*").eq("guilda_id", self._guild_id).execute()
+            if db.data:
+                supabase.table("economia_config").update(valores).eq("guilda_id", self._guild_id).execute()
+            else:
+                valores["habilitado"] = True
+                valores.setdefault("moedas_entrada", 10)
+                valores.setdefault("moedas_convite", 15)
+                valores.setdefault("moedas_torneio_participar", 20)
+                valores.setdefault("moedas_torneio_vencer", 100)
+                valores.setdefault("moedas_daily", 10)
+                valores.setdefault("limite_diario", 50)
+                supabase.table("economia_config").upsert(valores).execute()
+        except Exception as e:
+            print(f"🚨 Economia Nome Moeda ERRO: {e}")
+            await interaction.response.send_message("❌ Erro ao salvar o nome da moeda.", ephemeral=True)
+            return
+
+        try:
+            await interaction.response.send_message(f"✅ Nome da moeda salvo: **{valores['nome_moeda']}**", ephemeral=True)
+        except Exception as e:
+            print(f"🚨 Economia Nome Moeda resposta ERRO: {e}")
+
+        try:
+            guild = self._bot.get_guild(int(self._guild_id))
+            if guild:
+                embed, view = build_categoria(guild, "economia")
+                await interaction.edit_original_response(embed=embed, view=view)
+        except Exception as e:
+            print(f"🚨 Economia Nome Moeda painel ERRO: {e}")
 
 class SelectCargoComUpdate(discord.ui.View):
     def __init__(self, guild_id, bot, cat):
@@ -615,19 +865,63 @@ class Admin(commands.Cog):
 
     @app_commands.command(name="configurar", description="Configura a guilda pela primeira vez")
     async def configurar(self, interaction, cargo_membros: discord.Role, canal_notificacoes: discord.TextChannel):
-        if interaction.user.id != interaction.guild.owner_id:
-            return await interaction.response.send_message("⛔ Apenas o Dono.", ephemeral=True)
+        if not tem_permissao_admin(interaction):
+            return await interaction.response.send_message("⛔ Apenas o Dono, Admins ou Gestão.", ephemeral=True)
         await interaction.response.send_modal(ModalConfiguracao(str(cargo_membros.id), str(canal_notificacoes.id)))
 
     @app_commands.command(name="painel", description="Abre o Painel de Controlo")
     async def painel(self, interaction):
-        if interaction.user.id != interaction.guild.owner_id:
-            return await interaction.response.send_message("⛔ Apenas o Dono.", ephemeral=True)
+        if not tem_permissao_admin(interaction):
+            return await interaction.response.send_message("⛔ Apenas o Dono, Admins ou Gestão.", ephemeral=True)
         embed, view = build_categoria(interaction.guild, "main")
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    @app_commands.command(name="remover_servidor", description="Apaga todos os dados do bot deste servidor no Supabase")
+    async def remover_servidor(self, interaction):
+        if not tem_permissao_admin(interaction):
+            return await interaction.response.send_message("⛔ Apenas o Dono, Admins ou Gestão.", ephemeral=True)
+        
+        await interaction.response.defer(ephemeral=True)
+        guild_id = str(interaction.guild_id)
+        
+        tabelas = [
+            ("servidores", "id_discord"),
+            ("membros_verificados", "id_servidor"),
+            ("warns_config", "guilda_id"),
+            ("warns", "id_servidor"),
+            ("boas_vindas_config", "guilda_id"),
+            ("anti_raid_config", "guilda_id"),
+            ("notificacoes_config", "guilda_id"),
+            ("torneios", "guilda_id"),
+            ("torneios_config", "guilda_id"),
+            ("ranking_cache", "guilda_id"),
+            ("convites_config", "guilda_id"),
+            ("codigos_seguranca", "id_servidor"),
+            ("verificacao_automatica_config", "guilda_id"),
+        ]
+        
+        apagados = []
+        for tabela, campo in tabelas:
+            try:
+                res = supabase.table(tabela).delete().eq(campo, guild_id).execute()
+                if res.data:
+                    apagados.append(f"✅ {tabela}: {len(res.data)} registos")
+                else:
+                    apagados.append(f"⚪ {tabela}: nada")
+            except Exception as e:
+                apagados.append(f"❌ {tabela}: erro - {e}")
+        
+        embed = discord.Embed(
+            title="🗑️ Remoção de Dados do Servidor",
+            description=f"Dados associados ao servidor **{interaction.guild.name}** apagados do Supabase.",
+            color=discord.Color.from_rgb(255, 50, 50)
+        )
+        embed.add_field(name="Tabelas afetadas", value="\n".join(apagados), inline=False)
+        embed.set_footer(text="⚠️ Esta ação remove permanentemente todos os dados do bot deste servidor.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
 async def setup(bot):
-    for v in [ViewMenuPrincipal(), ViewBase(), ViewWarns(), ViewBV(), ViewRaid(), ViewNoti(), ViewTorneios(), ViewVerificacao()]:
+    for v in [ViewMenuPrincipal(), ViewBase(), ViewWarns(), ViewBV(), ViewRaid(), ViewNoti(), ViewTorneios(), ViewVerificacao(), ViewEconomia()]:
         bot.add_view(v)
     cog = Admin(bot)
     await bot.add_cog(cog)

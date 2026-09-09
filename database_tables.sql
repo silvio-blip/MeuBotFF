@@ -32,3 +32,28 @@ CREATE TABLE IF NOT EXISTS convites_config (
   habilitado BOOLEAN DEFAULT TRUE
 );
 ALTER TABLE convites_config DISABLE ROW LEVEL SECURITY;
+
+-- Economia do servidor (moedas por ação)
+CREATE TABLE IF NOT EXISTS economia_config (
+  guilda_id TEXT PRIMARY KEY,
+  moedas_entrada INT DEFAULT 10,
+  moedas_convite INT DEFAULT 15,
+  moedas_torneio_participar INT DEFAULT 20,
+  moedas_torneio_vencer INT DEFAULT 100,
+  moedas_daily INT DEFAULT 10,
+  moedas_daily_min INT DEFAULT 5,
+  moedas_daily_max INT DEFAULT 15,
+  nome_moeda TEXT DEFAULT 'moedas',
+  habilitado BOOLEAN DEFAULT TRUE
+);
+ALTER TABLE economia_config DISABLE ROW LEVEL SECURITY;
+
+-- Cooldown do daily por usuário por servidor por dia
+CREATE TABLE IF NOT EXISTS economia_daily (
+  user_id TEXT,
+  servidor_id TEXT,
+  data TEXT,
+  usado BOOLEAN DEFAULT FALSE,
+  PRIMARY KEY (user_id, servidor_id, data)
+);
+ALTER TABLE economia_daily DISABLE ROW LEVEL SECURITY;

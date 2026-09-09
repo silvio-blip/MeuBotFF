@@ -228,6 +228,18 @@ class Torneios(commands.Cog):
                 except discord.Forbidden:
                     pass
         
+        # Economia: recompensa por participar no torneio
+        try:
+            cfg_economia = supabase.table("economia_config").select("*").eq("guilda_id", str(interaction.guild_id)).execute()
+            if cfg_economia.data and cfg_economia.data[0].get("habilitado"):
+                moedas = cfg_economia.data[0].get("moedas_torneio_participar", 20)
+                for m in membros:
+                    db_user = supabase.table("membros_verificados").select("moedas").eq("id_discord", str(m.id)).eq("id_servidor", str(interaction.guild_id)).execute()
+                    saldo_atual = db_user.data[0]["moedas"] if db_user.data and db_user.data[0].get("moedas") is not None else 0
+                    supabase.table("membros_verificados").update({"moedas": saldo_atual + int(moedas)}).eq("id_discord", str(m.id)).eq("id_servidor", str(interaction.guild_id)).execute()
+        except Exception:
+            pass
+        
         await interaction.response.send_message(
             f"✅ Equipa **{nome_equipa}** criada!\n"
             f"**Modo:** {MODOS_NOME[modo]}\n"
@@ -484,6 +496,18 @@ class Torneios(commands.Cog):
                     db_torneio = supabase.table("torneios").select("*").eq("id", torneio_id_val).execute()
                     nome_torneio = db_torneio.data[0]["nome"] if db_torneio.data else "Torneio"
                     premiacao = db_torneio.data[0].get("premiacao", "—") if db_torneio.data else "—"
+                    
+                    # Economia: recompensa por vencer torneio
+                    try:
+                        cfg_economia = supabase.table("economia_config").select("*").eq("guilda_id", str(interaction.guild_id)).execute()
+                        if cfg_economia.data and cfg_economia.data[0].get("habilitado"):
+                            moedas = cfg_economia.data[0].get("moedas_torneio_vencer", 100)
+                            for m in db_membros_campeao.data:
+                                db_user = supabase.table("membros_verificados").select("moedas").eq("id_discord", str(m["usuario_id"])).eq("id_servidor", str(interaction.guild_id)).execute()
+                                saldo_atual = db_user.data[0]["moedas"] if db_user.data and db_user.data[0].get("moedas") is not None else 0
+                                supabase.table("membros_verificados").update({"moedas": saldo_atual + int(moedas)}).eq("id_discord", str(m["usuario_id"])).eq("id_servidor", str(interaction.guild_id)).execute()
+                    except Exception:
+                        pass
                     
                     # Enviar DM a todos da equipa campeã
                     db_membros_campeao = supabase.table("torneio_equipa_membros").select("usuario_id").eq("equipa_id", campeao_eq_id).execute()

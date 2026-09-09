@@ -5,89 +5,200 @@ from discord.ext import commands
 
 PAGINAS = {
     "inicio": ("🏠 Início", discord.Color.from_rgb(255, 50, 50),
-        "Bem-vindo ao **S.art Engine**, o bot definitivo para gestão de guildas Free Fire!\n\n"
-        "**📋 Categorias:**\n"
-        "1️⃣ Verificação · 2️⃣ Perfil · 3️⃣ Gestão · 4️⃣ Torneios\n"
-        "5️⃣ Ranking · 6️⃣ Warns · 7️⃣ Boas-Vindas\n"
-        "8️⃣ Anti-Raid · 9️⃣ Notificações · 🔟 Admin"),
+        "Bem-vindo ao **S.art Engine** — Bot completo para gestão de guildas Free Fire.\n\n"
+        "**📋 Categorias disponíveis:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🔐 **Verificação** — Entrada segura via ID FF\n"
+        "👤 **Perfil** — Dados completos do jogador\n"
+        "🛠️ **Gestão** — Moderação (cargo necessário)\n"
+        "🏆 **Torneios** — Solo/Duo/Trio/Squad\n"
+        "📊 **Ranking** — Top BR por pontos\n"
+        "⚠️ **Warns** — Sistema de advertências\n"
+        "👋 **Boas-Vindas** — Embed personalizada\n"
+        "🛡️ **Anti-Raid** — Proteção contra joins\n"
+        "🔔 **Notificações** — Alertas do FF\n"
+        "⚙️ **Admin** — Configuração do servidor\n\n"
+        "💡 *Seleciona uma categoria abaixo para ver detalhes, exemplos e como usar cada comando.*"),
 
-    "verificacao": ("1️⃣ Verificação", discord.Color.from_rgb(0, 255, 128),
-        "Garante que apenas membros da tua guilda FF entram no servidor.\n\n"
-        "**`/entrar`** — Inicia verificação\n"
-        "• Envia teu ID do Free Fire\n"
-        "• Verifica se pertences à guilda\n"
-        "• Muda idioma no perfil FF\n"
-        "• Tens 5 minutos\n"
-        "• Recebes cargo automaticamente\n\n"
-        "**`/desvincular`** — Remove teu registo"),
-
-    "perfil": ("2️⃣ Perfil", discord.Color.from_rgb(100, 150, 255),
-        "Dados completos de qualquer jogador verificado.\n\n"
-        "**`/perfil`** — Teu perfil\n"
-        "**`/perfil @membro`** — Perfil de outro\n\n"
-        "Dados: Nick, UID, Guilda, Nível, Likes, Patente BR/CS, Veterano, Data criação"),
-
-    "gestao": ("3️⃣ Gestão", discord.Color.from_rgb(255, 165, 0),
-        "Ferramentas de moderação (requer cargo de gestão).\n\n"
-        "**`/dar_cargo @membro cargo`**\n"
-        "**`/remover_cargo @membro cargo`**\n"
-        "**`/limpar quantidade`** — Até 100 msgs\n"
-        "**`/limpar_membro @membro qtd`**\n"
-        "**`/gestao_info`** — Info dos comandos"),
-
-    "torneios": ("4️⃣ Torneios", discord.Color.from_rgb(255, 215, 0),
-        "Torneios com equipas: Solo, Duo, Trio ou Squad.\n\n"
-        "**Admin:**\n"
-        "`/torneio_criar` — Criar torneio (escolhe o modo)\n"
-        "`/torneio_iniciar id` — Iniciar (verifica aprovações)\n"
-        "`/torneio_resultado id @venc` — Registar vencedor\n"
-        "`/torneio_finalizar id` — Encerrar\n\n"
-        "**Membros:**\n"
-        "`/torneio_equipa_criar id nome @m1 @m2...` — Criar equipa\n"
-        "`/torneio_equipa_ver id` — Ver equipas inscritas\n\n"
+    "verificacao": ("🔐 Verificação", discord.Color.from_rgb(0, 200, 128),
         "**Como funciona:**\n"
-        "1. Admin cria torneio com modo (Duo, Squad, etc)\n"
-        "2. Capitão cria equipa com os membros\n"
-        "3. Cada membro recebe DM com botão Aprovar/Rejeitar\n"
-        "4. Ao iniciar, equipas não aprovadas são eliminadas\n"
-        "5. Brackets gerados automaticamente com fases"),
+        "O bot verifica se tu pertences à guilda oficial do servidor antes de dar o cargo.\n\n"
+        "**Passo a passo:**\n"
+        "1. Usa `/entrar`\n"
+        "2. Escolhe o teu gênero\n"
+        "3. Insere idade + ID do Free Fire\n"
+        "4. O bot verifica se estás na guilda correta\n"
+        "5. Muda o **idioma da assinatura** no perfil FF para o que o bot pedir\n"
+        "6. Tens **5 minutos** — o radar detecta a mudança\n"
+        "7. ✅ Cargo entregue + dados salvos + DM com perfil\n\n"
+        "**Comandos:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/entrar`** — Inicia verificação\n"
+        "• *Parâmetros:* nenhum (interativo via botões/modal)\n"
+        "• *Exemplo:* `/entrar` → seleciona gênero → preenche idade/UID\n\n"
+        "**`/desvincular`** — Remove teu registo e cargo\n"
+        "• *Parâmetros:* nenhum\n"
+        "• *Exemplo:* `/desvincular` → apaga teus dados do bot\n\n"
+        "⚠️ **Importante:**\n"
+        "• Precisas ter guilda no FF\n"
+        "• A guilda deve ser a **oficial do servidor**\n"
+        "• Não feches DMs — recebes o cartão de perfil no final"),
 
-    "ranking": ("5️⃣ Ranking", discord.Color.from_rgb(255, 215, 0),
-        "Ranking por pontos Battle Royale em tempo real.\n\n"
-        "**`/ranking_guilda`** — Top 10\n"
-        "**`/meu_ranking`** — Tua posição\n"
-        "**`/atualizar_ranking`** — Força update (admin)"),
+    "perfil": ("👤 Perfil", discord.Color.from_rgb(80, 160, 255),
+        "**Mostra dados completos sincronizados do FF.**\n\n"
+        "**Comandos:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/perfil`** — Teu próprio perfil\n"
+        "• *Parâmetros:* nenhum\n\n"
+        "**`/perfil @membro`** — Perfil de outro jogador verificado\n"
+        "• *Parâmetro:* `membro` (obrigatório)\n"
+        "• *Exemplo:* `/perfil @Silvanio`\n\n"
+        "**Dados mostrados:**\n"
+        "• Nick FF + UID\n"
+        "• Guilda do jogo + nível + likes\n"
+        "• Patente BR (pontos) + CS (pontos + stats)\n"
+        "• Status de veterano (tempo de conta FF)\n"
+        "• Avatar FF + datas de criação (Discord + FF)\n"
+        "• Cargo principal + idade + gênero\n\n"
+        "⚠️ **Apenas membros verificados** têm perfil."),
 
-    "warns": ("6️⃣ Warns", discord.Color.from_rgb(255, 100, 100),
-        "Configurável pelo admin via `/painel`.\n\n"
-        "**`/dar_warn @membro`** — Adverte\n"
-        "**`/remover_warn @membro id`** — Remove\n"
-        "**`/lista_warns @membro`** — Lista\n\n"
-        "Limite: 3 strikes = ban (configurável)\n"
-        "Expiração: 30 dias (configurável)"),
+    "gestao": ("🛠️ Gestão", discord.Color.from_rgb(255, 165, 0),
+        "**Ferramentas de moderação** — Requer cargo de gestão configurado no `/painel` ou permissão de Administrador.\n\n"
+        "**Comandos:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/dar_cargo @membro @cargo`**\n"
+        "• Adiciona cargo ao membro\n"
+        "• *Exemplo:* `/dar_cargo @User @Membro`\n\n"
+        "**`/remover_cargo @membro @cargo`**\n"
+        "• Remove cargo do membro\n"
+        "• *Exemplo:* `/remover_cargo @User @Membro`\n\n"
+        "**`/limpar <quantidade>`**\n"
+        "• Apaga mensagens recentes (1-100)\n"
+        "• *Exemplo:* `/limpar 50`\n\n"
+        "**`/limpar_membro @membro <quantidade>`**\n"
+        "• Apaga só mensagens de um usuário (1-100)\n"
+        "• *Exemplo:* `/limpar_membro @User 20`\n\n"
+        "**`/gestao_info`** — Mostra cargo de gestão atual\n\n"
+        "⚠️ **Regras:**\n"
+        "• Não podes mexer em cargos ≥ teu topo\n"
+        "• Bot precisa ter permissão + cargo acima do alvo"),
 
-    "boas_vindas": ("7️⃣ Boas-Vindas", discord.Color.from_rgb(0, 200, 255),
-        "Embed automática ao entrar no servidor.\n"
-        "Configura via `/painel` → Boas-Vindas.\n\n"
-        "Opções: Título, descrição ({user}, {membros}), cor, canal, toggle"),
+    "torneios": ("🏆 Torneios", discord.Color.from_rgb(255, 215, 0),
+        "**Sistema completo de torneios com equipas.**\nModos: **Solo • Duo • Trio • Squad**\n\n"
+        "**Fluxo completo:**\n"
+        "1. Admin: `/torneio_criar` → escolhe modo + detalhes\n"
+        "2. Capitães: `/torneio_equipa_criar` → forma equipa\n"
+        "3. Cada membro recebe **DM com botão Aprovar/Rejeitar**\n"
+        "4. Admin: `/torneio_iniciar` → elimina não aprovados + gera brackets\n"
+        "5. Jogo rola → Admin: `/torneio_resultado` por partida\n"
+        "6. Final: `/torneio_finalizar` → DM ao campeão + anúncio + limpeza\n\n"
+        "**Comandos Admin:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/torneio_criar`** — Modal: nome, modo, descrição, data, prêmios\n"
+        "**`/torneio_iniciar <id>`** — Inicia, verifica aprovações\n"
+        "**`/torneio_resultado <id> @vencedor`** — Regista vencedor da partida\n"
+        "**`/torneio_finalizar <id>`** — Encerra + anuncia campeão\n"
+        "**`/torneio_lista`** — Lista torneios do servidor\n\n"
+        "**Comandos Membros:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/torneio_equipa_criar <id> <nome> @m1 @m2...`** — Cria equipa\n"
+        "**`/torneio_equipa_ver <id>`** — Vê equipas inscritas\n"
+        "**`/torneio_bracket <id>`** — Vê árvore do torneio"),
 
-    "anti_raid": ("8️⃣ Anti-Raid", discord.Color.from_rgb(255, 50, 50),
-        "Proteção contra joins em massa.\n"
-        "Configura via `/painel` → Anti-Raid.\n\n"
-        "Rate limit + auto-lock contra spam de joins"),
+    "ranking": ("📊 Ranking", discord.Color.from_rgb(100, 200, 255),
+        "**Ranking por pontos Battle Royale** — Atualizado via API.\n\n"
+        "**Comandos:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/ranking_guilda`** — Top 10 da guilda\n"
+        "• Mostra: posição, nick, pontos BR, patente\n\n"
+        "**`/meu_ranking`** — Tua posição exata\n"
+        "• Mostra: tua posição, pontos, diferença pro próximo\n\n"
+        "**`/atualizar_ranking`** — Força sincronização (admin)\n"
+        "• Busca pontos atuais de todos os verificados\n\n"
+        "💡 O ranking atualiza automaticamente em background."),
 
-    "notificacoes": ("9️⃣ Notificações", discord.Color.from_rgb(150, 100, 255),
-        "Alertas automáticos sobre o Free Fire.\n"
-        "Configura via `/painel` → Notificações.\n\n"
-        "**`/verificar_membros`** — Verifica guilda FF\n\n"
-        "Tipos: Membros que saíram, Atualizações, Temporada"),
+    "warns": ("⚠️ Warns", discord.Color.from_rgb(255, 80, 80),
+        "**Sistema de advertências configurável** — Tudo via `/painel`.\n\n"
+        "**Como funciona:**\n"
+        "• Admin dá warn → membro acumula strikes\n"
+        "• No limite → **ban automático**\n"
+        "• Warns expiram após X dias (configurável)\n\n"
+        "**Comandos:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/dar_warn @membro <motivo>`** — Adiciona warn\n"
+        "• *Exemplo:* `/dar_warn @User Flood no chat`\n\n"
+        "**`/remover_warn @membro <id_warn>`** — Remove warn específico\n"
+        "• Usa ID mostrado em `/lista_warns`\n\n"
+        "**`/lista_warns @membro`** — Lista warns ativos\n"
+        "• Mostra: ID, motivo, data, quem deu\n\n"
+        "**Configuração no `/painel` → Warns:**\n"
+        "• Limite de warns (padrão: 3 = ban)\n"
+        "• Dias para expirar (padrão: 30)\n"
+        "• Canal de notificações\n"
+        "• Ligar/Desligar sistema"),
 
-    "admin": ("🔟 Admin", discord.Color.from_rgb(43, 45, 49),
-        "Apenas dono do servidor.\n\n"
-        "**`/configurar`** — Registra servidor\n"
-        "**`/painel`** — Painel completo para configurar TUDO\n\n"
-        "No painel podes configurar:\n"
-        "Guilda, Cargo, Canal, Warns, Boas-Vindas, Anti-Raid, Notificações"),
+    "boas_vindas": ("👋 Boas-Vindas", discord.Color.from_rgb(0, 200, 255),
+        "**Embed automática** quando novo membro entra.\n\n"
+        "**Configuração no `/painel` → Boas-Vindas:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "✏️ **Personalizar** — Título, descrição, cor (hex)\n"
+        "📢 **Canal** — Onde enviar\n"
+        "🔄 **Toggle** — Ligar/Desligar\n\n"
+        "**Variáveis disponíveis:**\n"
+        "• `{user}` — Menção do membro\n"
+        "• `{membros}` — Total de membros do servidor\n"
+        "• `{servidor}` — Nome do servidor\n\n"
+        "**Exemplo descrição:**\n"
+        "`Olá {user}! Bem-vindo ao {servidor}.\nSomos agora {membros} membros!`"),
+
+    "anti_raid": ("🛡️ Anti-Raid", discord.Color.from_rgb(255, 50, 80),
+        "**Proteção contra ataques de join em massa.**\n\n"
+        "**Como funciona:**\n"
+        "• Monitora joins por minuto\n"
+        "• Se passar do limite → **lockdown automático**\n"
+        "• Bloqueia @everyone de enviar mensagens\n"
+        "• Dura X minutos (configurável)\n\n"
+        "**Configuração no `/painel` → Anti-Raid:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "⚙️ **Limites** — Joins/min + duração do lock\n"
+        "🚨 **Canal alertas** — Onde avisar\n"
+        "🔄 **Toggle** — Ativar/Desativar\n\n"
+        "⚠️ Requer permissão `Gerenciar Cargos` + `Gerenciar Canais` no bot."),
+
+    "notificacoes": ("🔔 Notificações", discord.Color.from_rgb(160, 100, 255),
+        "**Alertas automáticos do Free Fire** — Configura no `/painel`.\n\n"
+        "**Tipos de notificação:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🔄 **Atualizações** — Novas versões/patches do FF\n"
+        "👤 **Membros** — Alguém saiu da guilda FF\n"
+        "📅 **Temporada** — Mudança de rank/season\n\n"
+        "**Comando extra:**\n"
+        "**`/verificar_membros`** — Verificação manual agora\n"
+        "• Checa todos os verificados vs guilda FF\n"
+        "• Remove cargo de quem saiu\n\n"
+        "**Configuração no `/painel` → Notificações:**\n"
+        "Canal para cada tipo + toggle geral"),
+
+    "admin": ("⚙️ Admin / Configuração", discord.Color.from_rgb(43, 45, 49),
+        "**Apenas Dono / Administrador / Cargo de Gestão.**\n\n"
+        "**Comandos principais:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/configurar @cargo_membros #canal_logs`**\n"
+        "• Registo inicial do servidor\n"
+        "• Define cargo de verificado + canal de logs\n"
+        "• Abre modal: nome, email, ID guilda FF\n\n"
+        "**`/painel`** — Painel visual completo (recomendado)\n"
+        "• Menu dropdown para navegar categorias\n"
+        "• Botões para alterar cada setting\n"
+        "• Toggles ON/OFF por sistema\n\n"
+        "**`/remover_servidor`** — **APAGA TUDO** do Supabase\n"
+        "• Membros, warns, torneios, configs, tudo\n"
+        "• **Irreversível** — usa com cuidado\n\n"
+        "**O que configuras no painel:**\n"
+        "• Guilda FF + Cargo verificado + Canal logs\n"
+        "• Cargo de Gestão (quem usa comandos mod)\n"
+        "• Warns, Boas-Vindas, Anti-Raid, Notificações\n"
+        "• Verificação Automática (diária)"),
 }
 
 ORDEM = list(PAGINAS.keys())
@@ -96,7 +207,7 @@ def build_ajuda(pagina_key):
     titulo, cor, texto = PAGINAS[pagina_key]
     idx = ORDEM.index(pagina_key)
     embed = discord.Embed(title=titulo, description=texto, color=cor)
-    embed.set_footer(text=f"Página {idx+1}/{len(ORDEM)} — Usa os botões ou o menu")
+    embed.set_footer(text=f"Página {idx+1}/{len(ORDEM)}  •  Usa os botões ◀ 🏠 ▶ ou o menu dropdown")
     return embed, AjudaView(pagina_key)
 
 
@@ -126,8 +237,8 @@ class AjudaView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=view)
 
     @discord.ui.select(
-        placeholder="Navegar...",
-        options=[discord.SelectOption(label=v[0], value=k) for k, v in PAGINAS.items()],
+        placeholder="📚 Seleciona uma categoria...",
+        options=[discord.SelectOption(label=v[0], value=k, emoji=v[0][0]) for k, v in PAGINAS.items()],
         custom_id="ajuda_select"
     )
     async def select_pagina(self, interaction, select):
@@ -140,7 +251,7 @@ class Ajuda(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ajuda", description="Guia completo de como usar o bot")
+    @app_commands.command(name="ajuda", description="Guia completo com exemplos de todos os comandos")
     async def ajuda(self, interaction):
         embed, view = build_ajuda("inicio")
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
