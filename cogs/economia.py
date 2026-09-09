@@ -17,7 +17,7 @@ def get_emoji_moeda(guild_id, guild=None):
         emoji = discord.utils.get(guild.emojis, name="moedas")
         if emoji:
             return str(emoji)
-    return "💰"
+    return "<:moedas:1547276353420656794>"
 
 
 
