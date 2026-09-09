@@ -12,6 +12,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.guilds = True
 
 class MeuBot(commands.Bot):
     def __init__(self):
@@ -61,6 +62,11 @@ class MeuBot(commands.Bot):
                 return False
         except Exception as e:
             print(f"🚨 Erro no global_check (servidores): {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("⚠️ Erro de base de dados. Usa `/painel` de novo.", ephemeral=True)
+            except Exception:
+                pass
             return False
 
         is_owner = interaction.user.id == interaction.guild.owner_id
@@ -84,12 +90,23 @@ class MeuBot(commands.Bot):
                 return False
         except Exception as e:
             print(f"🚨 Erro no global_check (membros): {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("⚠️ Erro de base de dados. Usa `/painel` de novo.", ephemeral=True)
+            except Exception:
+                pass
             return False
 
         return True
 
     async def on_application_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CheckFailure):
+            print(f"⚠️ CheckFailure no comando: {interaction.command.name if interaction.command else 'desconhecido'}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("⛔ Acesso negado.", ephemeral=True)
+            except Exception:
+                pass
             return
         cmd_name = interaction.command.name if interaction.command else "desconhecido"
         print(f"🚨 Erro no comando {cmd_name}: {error}")
