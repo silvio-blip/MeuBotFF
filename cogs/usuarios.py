@@ -609,11 +609,10 @@ class Usuarios(commands.Cog):
 
         embed_perfil.set_footer(text="S.art Engine • Proteção e Base de Dados")
 
-        from cogs.economia import get_emoji_moeda
-        emoji_moeda = get_emoji_moeda(str(interaction.guild_id))
+        from cogs.economia import ICONE_MOEDA
 
         try:
-            discord_avatar = await download_image(f"{alvo.display_avatar.url}?size=256", session)
+            icone_moeda_img = await download_image(ICONE_MOEDA, session)
 
             if thumbnail_id:
                 ff_avatar_url = f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png"
@@ -621,7 +620,7 @@ class Usuarios(commands.Cog):
                 ff_avatar_url = "https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/1446515346201776283_1774.png"
             ff_avatar = await download_image(ff_avatar_url, session)
 
-            if discord_avatar and ff_avatar:
+            if icone_moeda_img and ff_avatar:
                 card_bytes = gerar_perfil_card(
                     nick_ff=jogador_nome,
                     uid=uid,
@@ -633,14 +632,14 @@ class Usuarios(commands.Cog):
                     cs_pontos=cs_pontos,
                     status_veterano=status_veterano,
                     moedas=moedas,
-                    emoji_moeda=emoji_moeda,
+                    icone_moeda_img=icone_moeda_img,
                     data_criacao_jogo=datetime.fromtimestamp(ff_criacao).strftime("%d/%m/%Y") if ff_criacao > 0 else "Desconhecido",
-                    discord_avatar_img=discord_avatar,
                     ff_avatar_img=ff_avatar
                 )
 
                 file = discord.File(io.BytesIO(card_bytes), filename="perfil.png")
                 embed_perfil.set_image(url="attachment://perfil.png")
+                await interaction.followup.send(embed=embed_perfil, file=file)
                 await interaction.followup.send(embed=embed_perfil, file=file)
             else:
                 await interaction.followup.send(embed=embed_perfil)

@@ -40,8 +40,8 @@ def avatar_circular(img, tamanho=100):
 def gerar_perfil_card(
     nick_ff, uid, nome_guilda, nivel, likes,
     br_pontos, patente_br, cs_pontos, status_veterano,
-    moedas, emoji_moeda, data_criacao_jogo,
-    discord_avatar_img, ff_avatar_img
+    moedas, icone_moeda_img, data_criacao_jogo,
+    ff_avatar_img
 ):
     LARGURA, ALTURA = 900, 520
     bg_color = (20, 20, 40)
@@ -62,13 +62,10 @@ def gerar_perfil_card(
     draw.rectangle((0, 0, LARGURA, 70), fill=(40, 40, 70))
     draw.text((20, 22), " S.art Engine  Perfil Verificado", fill=accent, font=font_titulo)
 
-    discord_avatar_circ = avatar_circular(discord_avatar_img, 110)
-    canvas.paste(discord_avatar_circ, (30, 95), discord_avatar_circ)
-
     ff_avatar_circ = avatar_circular(ff_avatar_img, 90)
-    canvas.paste(ff_avatar_circ, (760, 95), ff_avatar_circ)
+    canvas.paste(ff_avatar_circ, (770, 100), ff_avatar_circ)
 
-    x_info = 170
+    x_info = 30
     y_inicio = 100
 
     draw.text((x_info, y_inicio), nick_ff, fill=texto_branco, font=font_nome)
@@ -89,11 +86,14 @@ def gerar_perfil_card(
     draw.text((x_info, y_inicio + 285), f"  {data_criacao_jogo}", fill=texto_branco, font=font_medio)
 
     y_coins = y_inicio + 325
-    draw.rectangle((x_info - 10, y_coins - 5, x_info + 300, y_coins + 45), fill=(40, 40, 70), outline=accent, width=2)
-    draw.text((x_info + 15, y_coins + 8), f"{emoji_moeda}  Saldo de moedas: {moedas}", fill=dourado, font=font_grande)
+    draw.rectangle((x_info - 10, y_coins - 5, x_info + 320, y_coins + 50), fill=(40, 40, 70), outline=accent, width=2)
+    icone_moeda_circ = icone_moeda_img.resize((40, 40)) if icone_moeda_img else None
+    if icone_moeda_circ:
+        canvas.paste(icone_moeda_circ, (x_info + 10, y_coins + 5), icone_moeda_circ.convert("RGBA"))
+    draw.text((x_info + 60, y_coins + 10), f"Saldo de moedas: {moedas}", fill=dourado, font=font_grande)
 
-    draw.line((x_info - 10, y_inicio + 360, x_info + 500, y_inicio + 360), fill=(80, 80, 110), width=1)
-    draw.text((x_info, y_inicio + 375), "Cartão gerado pelo S.art Engine", fill=(100, 100, 120), font=font_pequeno)
+    draw.line((x_info - 10, y_inicio + 375, x_info + 500, y_inicio + 375), fill=(80, 80, 110), width=1)
+    draw.text((x_info, y_inicio + 385), "Cartão gerado pelo S.art Engine", fill=(100, 100, 120), font=font_pequeno)
 
     buffer = io.BytesIO()
     canvas.save(buffer, format="PNG")

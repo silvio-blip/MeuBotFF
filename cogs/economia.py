@@ -5,17 +5,7 @@ from discord.ext import commands
 from datetime import datetime, timezone
 from database import supabase
 
-
-def get_emoji_moeda(guild_id):
-    try:
-        db = supabase.table("economia_config").select("emoji_moeda").eq("guilda_id", str(guild_id)).execute()
-        if db.data and db.data[0].get("emoji_moeda"):
-            return db.data[0]["emoji_moeda"]
-    except Exception:
-        pass
-    return "<:moedas:1547276353420656794>"
-
-
+ICONE_MOEDA = "https://media.discordapp.net/attachments/1487374232886448248/1487556792614391888/correto_1446515346201776283_1774.png?ex=6aa27178&is=6aa11ff8&hm=13d109fdc3a542816f941c58f78489e1df56b1dfbf6a901bc28659038b0290fc"
 
 
 def ler_config(guild_id):
@@ -86,12 +76,12 @@ class Economia(commands.Cog):
 
         saldo_atual = get_saldo(guild_id, user_id)
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(interaction.guild_id)
         embed = discord.Embed(
-            title=f"{emoji_moeda} Carteira de {interaction.user.display_name}",
+            title=f"💰 Carteira de {interaction.user.display_name}",
             description=f"Saldo atual: **{saldo_atual}** {nome_moeda}",
             color=discord.Color.from_rgb(255, 215, 0)
         )
+        embed.set_thumbnail(url=ICONE_MOEDA)
         embed.set_footer(text="Ganha moedas participando no servidor!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -107,18 +97,18 @@ class Economia(commands.Cog):
             return await interaction.response.send_message("❌ Ainda ninguém tem moedas neste servidor.", ephemeral=True)
 
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(interaction.guild_id)
         linhas = []
         for i, item in enumerate(top, 1):
             membro = interaction.guild.get_member(int(item["id_discord"]))
             nome = membro.display_name if membro else f"`{item['id_discord']}`"
-            linhas.append(f"**{i}.** {nome} — {emoji_moeda} `{item['moedas']}` {nome_moeda}")
+            linhas.append(f"**{i}.** {nome} — 💰 `{item['moedas']}` {nome_moeda}")
 
         embed = discord.Embed(
-            title=f"{emoji_moeda} Top Moedas do Servidor",
+            title=f"💰 Top Moedas do Servidor",
             description="\n".join(linhas),
             color=discord.Color.from_rgb(255, 215, 0)
         )
+        embed.set_thumbnail(url=ICONE_MOEDA)
         embed.set_footer(text="Ganha mais moedas participando!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -141,13 +131,13 @@ class Economia(commands.Cog):
         marcar_daily(guild_id, user_id)
         saldo_atual = get_saldo(guild_id, user_id)
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(interaction.guild_id)
 
         embed = discord.Embed(
-            title=f"✅ Daily Resgatado! {emoji_moeda}",
+            title=f"✅ Daily Resgatado!",
             description=f"Ganhas-te **{quantidade}** {nome_moeda}!\nSaldo atual: **{saldo_atual}** {nome_moeda}",
             color=discord.Color.from_rgb(255, 215, 0)
         )
+        embed.set_thumbnail(url=ICONE_MOEDA)
         embed.set_footer(text="Volta amanhã para mais!")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
