@@ -10,6 +10,7 @@ API_VERCEL_KEY = os.getenv("API_VERCEL_KEY")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+IMGBB_API_KEY = os.getenv("IMGBB_API_KEY")
 
 missing = [k for k, v in {
     "DISCORD_TOKEN": DISCORD_TOKEN,
