@@ -1,6 +1,4 @@
 # cogs/fundo.py
-import io
-import json
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -15,52 +13,45 @@ def log_sart(mensagem):
     print(f"[{agora}] ⚙️ [S.art] {mensagem}")
 
 
-HF_API_URL = "https://api-inference.huggingface.co/models/briaai/RIFLE"
-HF_TIMEOUT = aiohttp.ClientTimeout(total=60)
+CLIPDROP_API_URL = "https://clipdrop-api.co/remove-background/v1"
+CLIPDROP_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 
-async def remover_fundo_hf(image_bytes: bytes, hf_api_key: str, session: aiohttp.ClientSession) -> bytes:
-    headers = {"Authorization": f"Bearer {hf_api_key}", "Content-Type": "application/octet-stream"}
-    try:
-        async with session.post(
-            HF_API_URL,
-            headers=headers,
-            data=image_bytes,
-            timeout=HF_TIMEOUT,
-        ) as resp:
-            if resp.status == 503:
-                msg = await resp.text()
-                raise RuntimeError(f"Modelo em carregamento. Tenta de novo em 1 minuto. ({msg})")
-            if resp.status == 429:
-                raise RuntimeError("Rate limit atingido. Espera um pouco e tenta de novo.")
-            if resp.status != 200:
-                text = await resp.text()
-                raise RuntimeError(f"Hugging Face retornou status {resp.status}: {text}")
+async def remover_fundo_clipdrop(image_bytes: bytes, api_key: str, session: aiohttp.ClientSession) -> bytes:
+    fname = "upload"
+    form = aiohttp.FormData()
+    form.add_field("image_file", image_bytes, filename=fname, content_type="image/png")
 
-            content_type = resp.headers.get("Content-Type", "")
-            if "application/json" in content_type:
-                data = await resp.json()
-                raise RuntimeError(data.get("error", "Erro desconhecido na API Hugging Face"))
+    headers = {"x-api-key": api_key}
 
-            return await resp.read()
-    except aiohttp.ClientError as e:
-        raise RuntimeError(f"Erro de rede ao contactar Hugging Face: {e}")
+    async with session.post(
+        CLIPDROP_API_URL,
+        headers=headers,
+        data=form,
+        timeout=CLIPDROP_TIMEOUT,
+    ) as resp:
+        if resp.status == 401:
+            raise RuntimeError("API key inválida para o Clipdrop.")
+        if resp.status != 200:
+            text = await resp.text()
+            raise RuntimeError(f"Clipdrop retornou status {resp.status}: {text}")
+        return await resp.read()
 
 
 class Fundo(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="fundo", description="Remove o fundo de uma imagem usando Hugging Face")
+    @app_commands.command(name="fundo", description="Remove o fundo de uma imagem usando Clipdrop")
     async def fundo(self, interaction: discord.Interaction, arquivo: discord.Attachment):
         await interaction.response.defer(ephemeral=True)
 
         if not arquivo.content_type or not arquivo.content_type.startswith("image/"):
             return await interaction.followup.send("❌ O ficheiro anexado não é uma imagem válida.", ephemeral=True)
 
-        hf_api_key = getattr(config, "HF_API_KEY", None)
-        if not hf_api_key:
-            return await interaction.followup.send("⚠️ A API do Hugging Face não está configurada (`HF_API_KEY`).", ephemeral=True)
+        api_key = getattr(config, "CLIPDROP_API_KEY", None)
+        if not api_key:
+            return await interaction.followup.send("⚠️ A API do Clipdrop não está configurada (`CLIPDROP_API_KEY`).", ephemeral=True)
 
         try:
             image_bytes = await arquivo.read()
@@ -71,19 +62,19 @@ class Fundo(commands.Cog):
 
         session = interaction.client.session
         try:
-            resultado_bytes = await remover_fundo_hf(image_bytes, hf_api_key, session)
+            resultado_bytes = await remover_fundo_clipdrop(image_bytes, api_key, session)
         except RuntimeError as e:
             return await interaction.followup.send(f"❌ {e}", ephemeral=True)
         except Exception as e:
-            log_sart(f"🚨 Erro ao remover fundo via HF: {e}")
-            return await interaction.followup.send("❌ Erro ao processar a imagem via Hugging Face.", ephemeral=True)
+            log_sart(f"🚨 Erro ao remover fundo via Clipdrop: {e}")
+            return await interaction.followup.send("❌ Erro ao processar a imagem. Tenta novamente.", ephemeral=True)
 
-        api_key = getattr(config, "IMGBB_API_KEY", None)
-        if not api_key:
+        imgbb_key = getattr(config, "IMGBB_API_KEY", None)
+        if not imgbb_key:
             return await interaction.followup.send("⚠️ O serviço de hospedagem de imagens não está configurado.", ephemeral=True)
 
         try:
-            resultado = await upload_to_imgbb(resultado_bytes, api_key)
+            resultado = await upload_to_imgbb(resultado_bytes, imgbb_key)
             dados = resultado.get("data", {})
             link = dados.get("url")
             link_curto = dados.get("url_viewer", link)
@@ -101,9 +92,9 @@ class Fundo(commands.Cog):
                 timestamp=datetime.now()
             )
             embed.set_image(url=link)
-            embed.set_footer(text="S.art Engine • Remoção de Fundo (Hugging Face)")
+            embed.set_footer(text="S.art Engine • Remoção de Fundo (Clipdrop)")
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-            log_sart(f"✂️ Fundo removido via HF para {interaction.user.name}: {link}")
+            log_sart(f"✂️ Fundo removido via Clipdrop para {interaction.user.name}: {link}")
 
         except Exception as e:
             log_sart(f"🚨 Erro ao hospedar imagem sem fundo: {e}")
