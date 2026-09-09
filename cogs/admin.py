@@ -567,7 +567,7 @@ def build_categoria(guild, cat):
             description="Configura as recompensas e limites do sistema de moedas.",
             color=discord.Color.from_rgb(255, 215, 0)
         )
-        embed.set_thumbnail(url="https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/1446515346201776283_1774.png")
+        embed.set_thumbnail(url="https://media.discordapp.net/attachments/1487374232886448248/1487556792614391888/correto_1446515346201776283_1774.png?ex=6aa27178&is=6aa11ff8&hm=13d109fdc3a542816f941c58f78489e1df56b1dfbf6a901bc28659038b0290fc")
         embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
         embed.add_field(name="📊 Status", value=on_off(on), inline=True)
         embed.add_field(name="🏷️ Nome da Moeda", value=f"`{nome_moeda}`", inline=True)

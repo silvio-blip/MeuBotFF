@@ -5,7 +5,7 @@ from discord.ext import commands
 from datetime import datetime, timezone
 from database import supabase
 
-ICONE_MOEDA = "https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/1446515346201776283_1774.png"
+ICONE_MOEDA = "https://media.discordapp.net/attachments/1487374232886448248/1487556792614391888/correto_1446515346201776283_1774.png?ex=6aa27178&is=6aa11ff8&hm=13d109fdc3a542816f941c58f78489e1df56b1dfbf6a901bc28659038b0290fc"
 
 
 def ler_config(guild_id):
