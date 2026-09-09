@@ -306,6 +306,13 @@ async def processar_radar(interaction: discord.Interaction, user: discord.Member
             try:
                 await user.add_roles(cargo)
                 log_sart(f"🎖️ Cargo entregue a {user.name}.")
+                try:
+                    await user.edit(nick=jogador_nome, reason="Verificação S.art: nome atualizado para o nick do jogo")
+                    log_sart(f"✏️ Apelido de {user.name} atualizado para '{jogador_nome}'.")
+                except discord.Forbidden:
+                    log_sart(f"⚠️ Sem permissão para mudar apelido de {user.name}.")
+                except Exception as e:
+                    log_sart(f"⚠️ Erro ao mudar apelido de {user.name}: {e}")
                 
                 db_user_check = supabase.table("membros_verificados").select("log_message_id").eq("id_discord", str(user.id)).eq("id_servidor", str(guild.id)).execute()
                 old_log_id = None
@@ -595,8 +602,7 @@ class Usuarios(commands.Cog):
             cargo_principal = " Desconhecido"
         embed_perfil.add_field(name="🎭 Cargo Principal", value=cargo_principal, inline=True)
 
-        if thumbnail_id:
-            embed_perfil.set_thumbnail(url=f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png")
+        embed_perfil.set_thumbnail(url=alvo.display_avatar.url)
 
         if ff_criacao > 0:
             embed_perfil.add_field(
