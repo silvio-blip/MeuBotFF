@@ -602,7 +602,8 @@ class Usuarios(commands.Cog):
             cargo_principal = " Desconhecido"
         embed_perfil.add_field(name="🎭 Cargo Principal", value=cargo_principal, inline=True)
 
-        embed_perfil.set_thumbnail(url=alvo.display_avatar.url)
+        if thumbnail_id:
+            embed_perfil.set_thumbnail(url=f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png")
 
         if ff_criacao > 0:
             embed_perfil.add_field(
