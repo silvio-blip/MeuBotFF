@@ -563,7 +563,7 @@ def build_categoria(guild, cat):
         daily_min = cfg.get("moedas_daily_min", 5)
         daily_max = cfg.get("moedas_daily_max", 15)
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(guild_id, guild)
+        emoji_moeda = get_emoji_moeda(guild_id)
         embed = discord.Embed(
             title=f"{emoji_moeda} Economia do Servidor",
             description="Configura as recompensas e limites do sistema de moedas.",
