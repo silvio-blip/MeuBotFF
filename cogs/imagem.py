@@ -58,6 +58,9 @@ class Imagem(commands.Cog):
             if not link:
                 return await interaction.followup.send("❌ O serviço de hospedagem não retornou um link válido.", ephemeral=True)
 
+            view = discord.ui.View()
+            view.add_item(discord.ui.Button(label="🔗 Abrir / Copiar Link", style=discord.ButtonStyle.link, url=link))
+
             embed = discord.Embed(
                 title="🖼️ Imagem Hospedada",
                 description=f"**Link direto:** [Abrir imagem]({link})\n**Link visualizador:** [Abrir no ImgBB]({link_curto})",
@@ -66,7 +69,7 @@ class Imagem(commands.Cog):
             )
             embed.set_image(url=link)
             embed.set_footer(text="S.art Engine • Hospedagem de Imagens")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
             log_sart(f"🖼️ Imagem hospedada para {interaction.user.name}: {link}")
 
         except Exception as e:
