@@ -6,7 +6,13 @@ from datetime import datetime, timezone
 from database import supabase
 
 
-def get_emoji_moeda(guild):
+def get_emoji_moeda(guild_id, guild=None):
+    try:
+        db = supabase.table("economia_config").select("emoji_moeda").eq("guilda_id", str(guild_id)).execute()
+        if db.data and db.data[0].get("emoji_moeda"):
+            return db.data[0]["emoji_moeda"]
+    except Exception:
+        pass
     if guild:
         emoji = discord.utils.get(guild.emojis, name="moedas")
         if emoji:
@@ -84,7 +90,7 @@ class Economia(commands.Cog):
 
         saldo_atual = get_saldo(guild_id, user_id)
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(interaction.guild)
+        emoji_moeda = get_emoji_moeda(interaction.guild_id, interaction.guild)
         embed = discord.Embed(
             title=f"{emoji_moeda} Carteira de {interaction.user.display_name}",
             description=f"Saldo atual: **{saldo_atual}** {nome_moeda}",
@@ -105,7 +111,7 @@ class Economia(commands.Cog):
             return await interaction.response.send_message("❌ Ainda ninguém tem moedas neste servidor.", ephemeral=True)
 
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(interaction.guild)
+        emoji_moeda = get_emoji_moeda(interaction.guild_id, interaction.guild)
         linhas = []
         for i, item in enumerate(top, 1):
             membro = interaction.guild.get_member(int(item["id_discord"]))
@@ -139,7 +145,7 @@ class Economia(commands.Cog):
         marcar_daily(guild_id, user_id)
         saldo_atual = get_saldo(guild_id, user_id)
         nome_moeda = cfg.get("nome_moeda", "moedas")
-        emoji_moeda = get_emoji_moeda(interaction.guild)
+        emoji_moeda = get_emoji_moeda(interaction.guild_id, interaction.guild)
 
         embed = discord.Embed(
             title=f"✅ Daily Resgatado! {emoji_moeda}",
