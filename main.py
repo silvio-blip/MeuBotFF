@@ -36,7 +36,6 @@ class MeuBot(commands.Bot):
         await self.load_extension('cogs.convites')
         await self.load_extension('cogs.economia')
         await self.load_extension('cogs.imagem')
-        await self.load_extension('cogs.fundo')
         self.tree.interaction_check = self.global_check
         if os.getenv("SYNC_COMMANDS", "true").lower() == "true":
             await self.tree.sync()
