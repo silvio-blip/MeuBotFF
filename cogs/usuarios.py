@@ -508,7 +508,7 @@ class Usuarios(commands.Cog):
         
         await interaction.response.defer(ephemeral=True) 
 
-        db_res = supabase.table("membros_verificados").select("id_ff").eq("id_discord", str(alvo.id)).eq("id_servidor", str(interaction.guild_id)).execute()
+        db_res = supabase.table("membros_verificados").select("id_ff, moedas").eq("id_discord", str(alvo.id)).eq("id_servidor", str(interaction.guild_id)).execute()
 
         if not db_res.data:
             return await interaction.followup.send(
@@ -516,6 +516,11 @@ class Usuarios(commands.Cog):
             )
 
         uid = db_res.data[0]["id_ff"]
+        moedas = db_res.data[0].get("moedas") or 0
+
+        cfg_economia = supabase.table("economia_config").select("nome_moeda").eq("guilda_id", str(interaction.guild_id)).execute()
+        nome_moeda = cfg_economia.data[0]["nome_moeda"] if cfg_economia.data else "moedas"
+
         url = f"{config.API_VERCEL_URL.rstrip('/')}/api/player?uid={uid}"
         headers = {"x-api-key": config.API_VERCEL_KEY, "Accept": "application/json"}
 
@@ -577,6 +582,7 @@ class Usuarios(commands.Cog):
         embed_perfil.add_field(name="🌍 Patente BR", value=f"{patente_br} ({br_pontos} pts)", inline=True)
         embed_perfil.add_field(name="⚔️ Clash Squad", value=cs_stats_text, inline=True)
         embed_perfil.add_field(name="🌟 Status Jogo", value=f"**{status_veterano}**", inline=True)
+        embed_perfil.add_field(name="💰 Moedas", value=f"**{moedas}** {nome_moeda}", inline=True)
 
         embed_perfil.add_field(name="━━━━━━━━━━━━━━━━━━", value="**👤 Perfil Discord**", inline=False)
 
