@@ -1,9 +1,9 @@
 # cogs/fundo.py
 import io
+import json
 import discord
 from discord import app_commands
 from discord.ext import commands
-from PIL import Image
 import aiohttp
 import config
 from datetime import datetime
@@ -15,60 +15,68 @@ def log_sart(mensagem):
     print(f"[{agora}] ⚙️ [S.art] {mensagem}")
 
 
-def remover_fundo(image_bytes: bytes) -> bytes:
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    w, h = img.size
-    if w < 50 or h < 50:
-        raise ValueError("Imagem muito pequena")
+HF_API_URL = "https://api-inference.huggingface.co/models/briaai/RIFLE"
+HF_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
-    pixels = img.load()
-    cantos = [
-        pixels[0, 0],
-        pixels[w - 1, 0],
-        pixels[0, h - 1],
-        pixels[w - 1, h - 1],
-    ]
-    r_fundo = sum(c[0] for c in cantos) // len(cantos)
-    g_fundo = sum(c[1] for c in cantos) // len(cantos)
-    b_fundo = sum(c[2] for c in cantos) // len(cantos)
 
-    threshold = 40
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = pixels[x, y]
-            dist = ((r - r_fundo) ** 2 + (g - g_fundo) ** 2 + (b - b_fundo) ** 2) ** 0.5
-            if dist < threshold:
-                pixels[x, y] = (r, g, b, 0)
+async def remover_fundo_hf(image_bytes: bytes, hf_api_key: str, session: aiohttp.ClientSession) -> bytes:
+    headers = {"Authorization": f"Bearer {hf_api_key}", "Content-Type": "application/octet-stream"}
+    try:
+        async with session.post(
+            HF_API_URL,
+            headers=headers,
+            data=image_bytes,
+            timeout=HF_TIMEOUT,
+        ) as resp:
+            if resp.status == 503:
+                msg = await resp.text()
+                raise RuntimeError(f"Modelo em carregamento. Tenta de novo em 1 minuto. ({msg})")
+            if resp.status == 429:
+                raise RuntimeError("Rate limit atingido. Espera um pouco e tenta de novo.")
+            if resp.status != 200:
+                text = await resp.text()
+                raise RuntimeError(f"Hugging Face retornou status {resp.status}: {text}")
 
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    return buffer.read()
+            content_type = resp.headers.get("Content-Type", "")
+            if "application/json" in content_type:
+                data = await resp.json()
+                raise RuntimeError(data.get("error", "Erro desconhecido na API Hugging Face"))
+
+            return await resp.read()
+    except aiohttp.ClientError as e:
+        raise RuntimeError(f"Erro de rede ao contactar Hugging Face: {e}")
 
 
 class Fundo(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="fundo", description="Remove o fundo de uma imagem")
+    @app_commands.command(name="fundo", description="Remove o fundo de uma imagem usando Hugging Face")
     async def fundo(self, interaction: discord.Interaction, arquivo: discord.Attachment):
         await interaction.response.defer(ephemeral=True)
 
         if not arquivo.content_type or not arquivo.content_type.startswith("image/"):
             return await interaction.followup.send("❌ O ficheiro anexado não é uma imagem válida.", ephemeral=True)
 
+        hf_api_key = getattr(config, "HF_API_KEY", None)
+        if not hf_api_key:
+            return await interaction.followup.send("⚠️ A API do Hugging Face não está configurada (`HF_API_KEY`).", ephemeral=True)
+
         try:
             image_bytes = await arquivo.read()
         except Exception:
             return await interaction.followup.send("❌ Erro ao ler o ficheiro anexado.", ephemeral=True)
 
+        await interaction.followup.send("✂️ A remover o fundo... (pode levar alguns segundos)", ephemeral=True)
+
+        session = interaction.client.session
         try:
-            resultado_bytes = remover_fundo(image_bytes)
-        except ValueError as e:
+            resultado_bytes = await remover_fundo_hf(image_bytes, hf_api_key, session)
+        except RuntimeError as e:
             return await interaction.followup.send(f"❌ {e}", ephemeral=True)
         except Exception as e:
-            log_sart(f"🚨 Erro ao remover fundo: {e}")
-            return await interaction.followup.send("❌ Erro ao processar a imagem.", ephemeral=True)
+            log_sart(f"🚨 Erro ao remover fundo via HF: {e}")
+            return await interaction.followup.send("❌ Erro ao processar a imagem via Hugging Face.", ephemeral=True)
 
         api_key = getattr(config, "IMGBB_API_KEY", None)
         if not api_key:
@@ -93,9 +101,9 @@ class Fundo(commands.Cog):
                 timestamp=datetime.now()
             )
             embed.set_image(url=link)
-            embed.set_footer(text="S.art Engine • Remoção de Fundo")
+            embed.set_footer(text="S.art Engine • Remoção de Fundo (Hugging Face)")
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-            log_sart(f"✂️ Fundo removido para {interaction.user.name}: {link}")
+            log_sart(f"✂️ Fundo removido via HF para {interaction.user.name}: {link}")
 
         except Exception as e:
             log_sart(f"🚨 Erro ao hospedar imagem sem fundo: {e}")
