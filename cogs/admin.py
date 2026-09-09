@@ -553,6 +553,7 @@ def build_categoria(guild, cat):
         return embed, ViewVerificacao()
 
     elif cat == "economia":
+        from cogs.economia import get_emoji_moeda
         cfg = ler_sub("economia_config", guild_id)
         on = cfg.get("habilitado", True)
         entrada = cfg.get("moedas_entrada", 10)
@@ -562,12 +563,12 @@ def build_categoria(guild, cat):
         daily_min = cfg.get("moedas_daily_min", 5)
         daily_max = cfg.get("moedas_daily_max", 15)
         nome_moeda = cfg.get("nome_moeda", "moedas")
+        emoji_moeda = get_emoji_moeda(guild)
         embed = discord.Embed(
-            title="💰 Economia do Servidor",
+            title=f"{emoji_moeda} Economia do Servidor",
             description="Configura as recompensas e limites do sistema de moedas.",
             color=discord.Color.from_rgb(255, 215, 0)
         )
-        embed.set_thumbnail(url="https://media.discordapp.net/attachments/1487374232886448248/1487556792614391888/correto_1446515346201776283_1774.png?ex=6aa27178&is=6aa11ff8&hm=13d109fdc3a542816f941c58f78489e1df56b1dfbf6a901bc28659038b0290fc")
         embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
         embed.add_field(name="📊 Status", value=on_off(on), inline=True)
         embed.add_field(name="🏷️ Nome da Moeda", value=f"`{nome_moeda}`", inline=True)
