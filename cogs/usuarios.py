@@ -591,7 +591,11 @@ class Usuarios(commands.Cog):
         embed_perfil.add_field(name="🖼️ Avatar", value=f"[Link]({alvo.display_avatar.url})", inline=True)
         embed_perfil.add_field(name="📅 Criação da Conta", value=f"<t:{int(alvo.created_at.timestamp())}:D>", inline=True)
         embed_perfil.add_field(name="📅 Entrada no Servidor", value=f"<t:{int(alvo.joined_at.timestamp())}:D>", inline=True)
-        embed_perfil.add_field(name="🎭 Cargo Principal", value=alvo.top_role.mention, inline=True)
+        try:
+            cargo_principal = alvo.top_role.mention
+        except Exception:
+            cargo_principal = " Desconhecido"
+        embed_perfil.add_field(name="🎭 Cargo Principal", value=cargo_principal, inline=True)
 
         if thumbnail_id:
             embed_perfil.set_thumbnail(url=f"https://cdn.jsdelivr.net/gh/ShahGCreator/icon@main/PNG/{thumbnail_id}.png")
