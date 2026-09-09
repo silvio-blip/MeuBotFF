@@ -12,3 +12,6 @@ aiohttp>=3.9.0              # Cliente HTTP assíncrono usado pelo bot e pela API
 
 # Variáveis de ambiente
 python-dotenv>=1.0.0        # Carrega variáveis do arquivo .env
+
+# Processamento de imagem
+Pillow>=10.0.0               # Manipulação de imagem (remoção simples de fundo)
