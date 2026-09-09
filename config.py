@@ -12,6 +12,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 IMGBB_API_KEY = os.getenv("IMGBB_API_KEY")
 CLIPDROP_API_KEY = os.getenv("CLIPDROP_API_KEY")
+HF_API_KEY = os.getenv("HF_API_KEY")
 
 missing = [k for k, v in {
     "DISCORD_TOKEN": DISCORD_TOKEN,
