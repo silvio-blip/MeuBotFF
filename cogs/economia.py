@@ -23,8 +23,8 @@ def adicionar_moedas(guild_id, user_id, quantidade):
         db_user = supabase.table("membros_verificados").select("moedas").eq("id_discord", str(user_id)).eq("id_servidor", str(guild_id)).execute()
         saldo_atual = db_user.data[0]["moedas"] if db_user.data and db_user.data[0].get("moedas") is not None else 0
         supabase.table("membros_verificados").update({"moedas": saldo_atual + int(quantidade)}).eq("id_discord", str(user_id)).eq("id_servidor", str(guild_id)).execute()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ECONOMIA] Erro adicionando moedas para {user_id}: {e}")
 
 
 def get_saldo(guild_id, user_id):
@@ -32,8 +32,8 @@ def get_saldo(guild_id, user_id):
         db = supabase.table("membros_verificados").select("moedas").eq("id_discord", str(user_id)).eq("id_servidor", str(guild_id)).execute()
         if db.data:
             return db.data[0].get("moedas") or 0
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ECONOMIA] Erro ao ler saldo de {user_id}: {e}")
     return 0
 
 
@@ -222,8 +222,14 @@ class Economia(commands.Cog):
         if quantidade <= 0:
             return await interaction.followup.send("❌ Quantidade deve ser maior que 0.", ephemeral=True)
         guild_id = str(interaction.guild_id)
-        adicionar_moedas(guild_id, str(membro.id), quantidade)
-        novo_saldo = get_saldo(guild_id, str(membro.id))
+        user_id = str(membro.id)
+
+        db_check = supabase.table("membros_verificados").select("moedas").eq("id_discord", user_id).eq("id_servidor", guild_id).execute()
+        if not db_check.data:
+            return await interaction.followup.send(f"❌ **{membro.display_name}** não está registado. Pede-lhe que verifique-se com `/entrar` primeiro.", ephemeral=True)
+
+        adicionar_moedas(guild_id, user_id, quantidade)
+        novo_saldo = get_saldo(guild_id, user_id)
         nome_moeda = ler_config(guild_id).get("nome_moeda", "moedas")
         embed = discord.Embed(
             title="✅ Moedas Adicionadas",
@@ -235,7 +241,7 @@ class Economia(commands.Cog):
         try:
             dm_embed = discord.Embed(
                 title="💸 Transferência Recebida",
-                description=f"Recebeste **{quantidade}** {nome_moeda} de {remetente.mention} em **{interaction.guild.name}**.\nNovo saldo: **{novo_saldo_des}** {nome_moeda}",
+                description=f"Recebeste **{quantidade}** {nome_moeda} de {interaction.user.mention} em **{interaction.guild.name}**.\nNovo saldo: **{novo_saldo}** {nome_moeda}",
                 color=discord.Color.gold()
             )
             dm_embed.set_thumbnail(url=ICONE_MOEDA)
@@ -255,9 +261,14 @@ class Economia(commands.Cog):
         if quantidade <= 0:
             return await interaction.followup.send("❌ Quantidade deve ser maior que 0.", ephemeral=True)
         guild_id = str(interaction.guild_id)
-        saldo_atual = get_saldo(guild_id, str(membro.id))
+        user_id = str(membro.id)
+        db_check = supabase.table("membros_verificados").select("id_discord").eq("id_discord", user_id).eq("id_servidor", guild_id).execute()
+        if not db_check.data:
+            return await interaction.followup.send(f"❌ **{membro.display_name}** não está registado. Pede-lhe que verifique-se com `/entrar` primeiro.", ephemeral=True)
+
+        saldo_atual = get_saldo(guild_id, user_id)
         nova_quantidade = max(0, saldo_atual - quantidade)
-        supabase.table("membros_verificados").update({"moedas": nova_quantidade}).eq("id_discord", str(membro.id)).eq("id_servidor", guild_id).execute()
+        supabase.table("membros_verificados").update({"moedas": nova_quantidade}).eq("id_discord", user_id).eq("id_servidor", guild_id).execute()
         nome_moeda = ler_config(guild_id).get("nome_moeda", "moedas")
         embed = discord.Embed(
             title="✅ Moedas Removidas",

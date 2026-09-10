@@ -3,7 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 import config
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from database import supabase
 
 class SelectCanalNotificacoes(discord.ui.View):
@@ -222,6 +222,114 @@ class Notificacoes(commands.Cog):
     @verificar_membros_task.before_loop
     async def before_verificar_membros(self):
         await self.bot.wait_until_ready()
+
+    async def on_member_remove(self, member: discord.Member):
+        try:
+            if member.bot:
+                return
+            guild = member.guild
+            guild_id = str(guild.id)
+
+            # --- Notificação de saída no canal_saida ---
+            db_noti = supabase.table("notificacoes_config").select("canal_saida", "habilitado").eq("guilda_id", guild_id).execute()
+            if not db_noti.data or not db_noti.data[0].get("habilitado", True):
+                await self._auto_desvincular(guild, guild_id, member)
+                return
+
+            canal_saida_id = db_noti.data[0].get("canal_saida")
+
+            db_user = supabase.table("membros_verificados").select("nick_ff, id_ff").eq("id_discord", str(member.id)).eq("id_servidor", guild_id).execute()
+            verificado = bool(db_user.data and db_user.data[0])
+
+            join_date = member.joined_at
+            if join_date:
+                tempo_no_servidor = datetime.now(timezone.utc) - join_date
+                dias = tempo_no_servidor.days
+                tempo_str = f"{dias} dias" if dias > 0 else f"{max(1, int(tempo_no_servidor.total_seconds() / 3600))} horas"
+            else:
+                tempo_str = "desconhecido"
+
+            title = "👤 Membro Saiu do Servidor"
+            if verificado:
+                nick_ff = db_user.data[0].get("nick_ff", "N/A")
+                uid = db_user.data[0].get("id_ff", "N/A")
+                description = (
+                    f"**{member.display_name}** (`{member.id}`) saiu do servidor.\n\n"
+                    f"**Informações FF:**\n"
+                    f"Nick: `{nick_ff}`\n"
+                    f"UID: `{uid}`\n"
+                    f"Tempo no servidor: `{tempo_str}`\n"
+                    f"🔄 **Conta desvinculada automaticamente.**"
+                )
+            else:
+                description = (
+                    f"**{member.display_name}** (`{member.id}`) saiu do servidor.\n\n"
+                    f"Não estava verificado.\n"
+                    f"Tempo no servidor: `{tempo_str}`"
+                )
+
+            if canal_saida_id and str(canal_saida_id).isdigit():
+                canal_saida = guild.get_channel(int(canal_saida_id))
+                if canal_saida:
+                    embed = discord.Embed(title=title, description=description, color=discord.Color.orange())
+                    embed.set_thumbnail(url=member.display_avatar.url if member.display_avatar else None)
+                    embed.set_footer(text="👋 Até logo!")
+                    await canal_saida.send(embed=embed)
+                    print(f"[NOTIFICACOES] Membro saiu: {member.display_name} em {guild.name} -> canal_saida")
+
+            # --- Auto-desvinculo: remove dados do bot quando sai do servidor ---
+            await self._auto_desvincular(guild, guild_id, member)
+        except Exception as e:
+            print(f"[NOTIFICACOES] Erro no on_member_remove: {e}")
+
+    async def _auto_desvincular(self, guild, guild_id, member):
+        try:
+            db_user = supabase.table("membros_verificados").select("nick_ff, id_ff, log_message_id").eq("id_discord", str(member.id)).eq("id_servidor", guild_id).execute()
+            if not db_user.data or not db_user.data[0]:
+                return
+
+            dados_user = db_user.data[0]
+            nick_ff = dados_user.get("nick_ff", "Desconhecido")
+            uid_ff = dados_user.get("id_ff", "Desconhecido")
+            old_log_id = dados_user.get("log_message_id")
+
+            db_server = supabase.table("servidores").select("canal_id").eq("id_discord", guild_id).execute()
+            canal_log = None
+            if db_server.data and db_server.data[0].get("canal_id"):
+                canal_log = guild.get_channel(int(db_server.data[0]["canal_id"]))
+
+            if canal_log and old_log_id:
+                try:
+                    old_msg = await canal_log.fetch_message(int(old_log_id))
+                    await old_msg.delete()
+                    print(f"[NOTIFICACOES] Auto-desvínculo: cartão de {nick_ff} removido do canal de logs.")
+                except Exception as e:
+                    print(f"[NOTIFICACOES] Auto-desvínculo: erro a deletar cartão ({e})")
+
+            db_noti = supabase.table("notificacoes_config").select("canal_desvinculo").eq("guilda_id", guild_id).execute()
+            canal_desvinculo = None
+            if db_noti.data and db_noti.data[0].get("canal_desvinculo"):
+                canal_desvinculo = guild.get_channel(int(db_noti.data[0]["canal_desvinculo"]))
+
+            if canal_desvinculo:
+                embed_saida = discord.Embed(
+                    title="👋 Remoção Automática de Registo",
+                    description=f"O utilizador **{member.display_name}** (`{member.id}`) saiu do servidor.\n"
+                                f"Os dados de verificação foram removidos automaticamente.",
+                    color=discord.Color.red()
+                )
+                embed_saida.add_field(name="Nick FF", value=f"`{nick_ff}`", inline=True)
+                embed_saida.add_field(name="UID", value=f"`{uid_ff}`", inline=True)
+                embed_saida.set_footer(text="Conta desvinculada automaticamente ao sair do servidor.")
+                try:
+                    await canal_desvinculo.send(embed=embed_saida)
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+
+            supabase.table("membros_verificados").delete().eq("id_discord", str(member.id)).eq("id_servidor", guild_id).execute()
+            print(f"[NOTIFICACOES] Auto-desvínculo concluído: {nick_ff} ({member.id}) em {guild.name}")
+        except Exception as e:
+            print(f"[NOTIFICACOES] Erro no auto_desvincular: {e}")
 
 async def setup(bot):
     await bot.add_cog(Notificacoes(bot))

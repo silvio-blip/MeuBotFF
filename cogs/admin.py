@@ -96,6 +96,7 @@ class ViewMenuPrincipal(discord.ui.View):
             discord.SelectOption(label="Verificação Automática", value="verificacao", emoji="🔄", description="Remover cargo de quem saiu da guilda FF"),
             discord.SelectOption(label="Economia", value="economia", emoji="💰", description="Moedas, recompensas e configurações"),
             discord.SelectOption(label="Música", value="musica", emoji="🎵", description="DJ, canal e permissões de música"),
+            discord.SelectOption(label="Palavrões", value="palavroes", emoji="🚫", description="Auto-timeout por linguagem imprópria"),
         ],
         custom_id="painel_menu_principal"
     )
@@ -403,6 +404,7 @@ def build_categoria(guild, cat):
     raid_cfg = ler_sub("anti_raid_config", guild_id)
     noti_cfg = ler_sub("notificacoes_config", guild_id)
     musica_cfg = ler_sub("musica_config", guild_id)
+    palavroes_cfg = ler_sub("palavroes_config", guild_id)
 
     db_members = supabase.table("membros_verificados").select("id_discord").eq("id_servidor", guild_id).execute()
     member_count = len(db_members.data) if db_members.data else 0
@@ -425,6 +427,7 @@ def build_categoria(guild, cat):
             ("⚠️ Warns", f"**Status:** {on_off(warns_cfg.get('habilitado', False))}\n📊 Limite: `{warns_cfg.get('max_warns', 3)}` warns\n⏰ Expira em: `{warns_cfg.get('dias_expiracao', 30)}` dias", True),
             ("👋 Boas-Vindas", f"**Status:** {on_off(bv_cfg.get('habilitado', False))}\n📢 Canal: {safe_channel(guild, bv_cfg.get('canal_id')).mention if safe_channel(guild, bv_cfg.get('canal_id')) else '⚠️ Não definido'}", True),
             ("🛡️ Anti-Raid", f"**Status:** {on_off(raid_cfg.get('habilitado', False))}\n📊 Limite: `{raid_cfg.get('limite_joins', 5)}` joins/min\n⏱️ Lock: `{raid_cfg.get('duracao_lock', 5)}` min", True),
+            ("🚫 Palavrões", f"**Status:** {on_off(palavroes_cfg.get('habilitado', False))}\n⏱️ Timeout: `{palavroes_cfg.get('duracao_timeout', 300)}`s", True),
             ("🔔 Notificações", f"**Status:** {on_off(noti_cfg.get('habilitado', False))}\n🎮 FF News, 👤 Saídas, 📅 Temporada", True),
             ("📊 Estatísticas", f"**👥 Verificados:** `{member_count}` membros\n🏆 Ranking ativo\n🔄 Verificação automática", True),
         ]
@@ -672,7 +675,7 @@ def build_categoria(guild, cat):
             "**Comandos Ativos:**\n"
             "`/play` — Toca uma música (DJ ou cargo-música)\n"
             "`/add_fila` — Adiciona à fila (aberto)\n"
-            "`/funk` — Toca um funk aleatório (DJ ou cargo-música)\n"
+            "`/funk` — Toca funks em loop automático (DJ ou cargo-música)\n"
             "`/pular` / `/pause` / `/resume` — Controlo de reprodução\n"
             "`/stop` / `/disconnect` — Para e desconecta o bot\n"
             "`/np` / `/fila` — Informação da sessão\n"
@@ -686,8 +689,225 @@ def build_categoria(guild, cat):
         embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewMusica()
 
+    elif cat == "palavroes":
+        pp_on = palavroes_cfg.get("habilitado", False)
+        pp_timeout = palavroes_cfg.get("duracao_timeout", 300)
+        pp_canal = safe_channel(guild, palavroes_cfg.get("canal_alertas"))
+        pp_cargos = palavroes_cfg.get("excluir_cargos", []) or []
+        pp_canais = palavroes_cfg.get("excluir_canais", []) or []
+        pp_deletar = palavroes_cfg.get("deletar_mensagem", True)
+        pp_aviso = palavroes_cfg.get("aviso_canal", False)
+
+        cargos_names = []
+        for rid in pp_cargos:
+            role = safe_role(guild, rid)
+            cargos_names.append(role.mention if role else f"`{rid}`")
+        canais_names = []
+        for cid in pp_canais:
+            ch = safe_channel(guild, cid)
+            canais_names.append(ch.mention if ch else f"`{cid}`")
+
+        embed = discord.Embed(
+            title="🚫 Sistema de Palavrões",
+            description="Detecta linguagem imprópria e aplica timeout automático.\n"
+                        "Admins/Owner e cargos excluídos são sempre isentos.",
+            color=discord.Color.from_rgb(255, 50, 50)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/1036/1036552.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(pp_on), inline=True)
+        embed.add_field(name="⏱️ Timeout", value=f"`{pp_timeout}s`", inline=True)
+        embed.add_field(name="🗑️ Deletar Mensagem", value=on_off(pp_deletar), inline=True)
+        embed.add_field(name="📢 Avisar no Canal", value=on_off(pp_aviso), inline=True)
+        embed.add_field(name="🚨 Canal Alertas", value=pp_canal.mention if pp_canal else "⚠️ Não definido", inline=True)
+        embed.add_field(name="🎖️ Cargos Isentos", value=", ".join(cargos_names) if cargos_names else "Nenhum", inline=False)
+        embed.add_field(name="📵 Canais Isentos", value=", ".join(canais_names) if canais_names else "Nenhum", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value=(
+            "**Ações disponíveis:**\n"
+            "⚙️ **Configurar Timeout** — Duração do silenciamento\n"
+            "🚨 **Canal Alertas** — Onde o bot reporta\n"
+            "🎖️ **Cargos Isentos** — Quem não leva timeout\n"
+            "📵 **Canais Isentos** — Onde o filtro não ativa\n"
+            "🔄 **Ligar/Desligar** — Ativa ou desativa o sistema"
+        ), inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
+        return embed, ViewPalavroes()
+
     embed, view = build_categoria(guild, "main")
     return embed, view
+
+class ModalConfigPalavroesTimeout(discord.ui.Modal, title='Configurar Timeout de Palavrões'):
+    duracao = discord.ui.TextInput(label='Duração do timeout (segundos)', placeholder='Ex: 300', default="300", required=True)
+
+    def __init__(self, guild_id, bot):
+        super().__init__()
+        self._guild_id = guild_id
+        self._bot = bot
+
+    async def on_submit(self, interaction):
+        try:
+            d = int(self.duracao.value)
+        except ValueError:
+            return await interaction.response.send_message("❌ Valor inválido! Insere um número.", ephemeral=True)
+        if d < 1 or d > 3600:
+            return await interaction.response.send_message("❌ A duração deve ser entre 1 e 3600 segundos (1h).", ephemeral=True)
+        supabase.table("palavroes_config").upsert({
+            "guilda_id": self._guild_id,
+            "duracao_timeout": d,
+            "habilitado": True
+        }).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "palavroes")
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class SelectCanalAlertasPalavroes(discord.ui.View):
+    def __init__(self, guild_id, bot):
+        super().__init__(timeout=300)
+        self._guild_id = guild_id
+        self._bot = bot
+
+    @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="🚨 Seleciona o canal de alertas...")
+    async def select(self, interaction, select: discord.ui.ChannelSelect):
+        canal = select.values[0]
+        supabase.table("palavroes_config").upsert({
+            "guilda_id": self._guild_id,
+            "canal_alertas": str(canal.id)
+        }).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "palavroes")
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class SelectCargosIsentosPalavroes(discord.ui.View):
+    def __init__(self, guild_id, bot):
+        super().__init__(timeout=300)
+        self._guild_id = guild_id
+        self._bot = bot
+
+    @discord.ui.select(
+        cls=discord.ui.RoleSelect,
+        placeholder="🎖️ Seleciona cargos isentos (pode selecionar vários)...",
+        min_values=0, max_values=25
+    )
+    async def select(self, interaction, select):
+        role_ids = [str(r.id) for r in select.values]
+        supabase.table("palavroes_config").upsert({
+            "guilda_id": self._guild_id,
+            "excluir_cargos": role_ids,
+            "habilitado": True
+        }).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "palavroes")
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class SelectCanaisIsentosPalavroes(discord.ui.View):
+    def __init__(self, guild_id, bot):
+        super().__init__(timeout=300)
+        self._guild_id = guild_id
+        self._bot = bot
+
+    @discord.ui.select(
+        cls=discord.ui.ChannelSelect,
+        channel_types=[discord.ChannelType.text],
+        placeholder="📵 Seleciona canais isentos (pode selecionar vários)...",
+        min_values=0, max_values=25
+    )
+    async def select(self, interaction, select):
+        canal_ids = [str(c.id) for c in select.values]
+        supabase.table("palavroes_config").upsert({
+            "guilda_id": self._guild_id,
+            "excluir_canais": canal_ids,
+            "habilitado": True
+        }).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "palavroes")
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ViewPalavroes(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.select(placeholder="📂 Voltar ao menu principal...", options=[discord.SelectOption(label="Menu Principal", value="main", emoji="📋")], custom_id="palavroes_back")
+    async def back(self, interaction, select):
+        embed, view = build_categoria(interaction.guild, "main")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Configurar Timeout", style=discord.ButtonStyle.primary, emoji="⏱️", custom_id="palavroes_config", row=1)
+    async def btn_config(self, interaction, button):
+        await interaction.response.send_modal(ModalConfigPalavroesTimeout(str(interaction.guild_id), interaction.client))
+
+    @discord.ui.button(label="Canal Alertas", style=discord.ButtonStyle.secondary, emoji="🚨", custom_id="palavroes_canal", row=1)
+    async def btn_canal(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o canal de alertas:**", view=SelectCanalAlertasPalavroes(str(interaction.guild_id), interaction.client), ephemeral=True)
+
+    @discord.ui.button(label="Cargos Isentos", style=discord.ButtonStyle.secondary, emoji="🎖️", custom_id="palavroes_cargos", row=1)
+    async def btn_cargos(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona cargos que não recebem timeout:**", view=SelectCargosIsentosPalavroes(str(interaction.guild_id), interaction.client), ephemeral=True)
+
+    @discord.ui.button(label="Canais Isentos", style=discord.ButtonStyle.secondary, emoji="📵", custom_id="palavroes_canais", row=1)
+    async def btn_canais(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona canais onde o filtro não ativa:**", view=SelectCanaisIsentosPalavroes(str(interaction.guild_id), interaction.client), ephemeral=True)
+
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="palavroes_toggle", row=2)
+    async def btn_toggle(self, interaction, button):
+        novo = toggle_config("palavroes_config", str(interaction.guild_id))
+        status = "ativado" if novo else "desativado"
+        await interaction.response.send_message(f"✅ Sistema de palavrões **{status}**.", ephemeral=True)
+
+    @discord.ui.button(label="Adicionar Palavra", style=discord.ButtonStyle.primary, emoji="➕", custom_id="palavroes_add", row=2)
+    async def btn_add(self, interaction, button):
+        await interaction.response.send_modal(ModalAddPalavra(str(interaction.guild_id), interaction.client))
+
+    @discord.ui.button(label="Listar Palavras", style=discord.ButtonStyle.secondary, emoji="📋", custom_id="palavroes_listar", row=2)
+    async def btn_listar(self, interaction, button):
+        cfg = ler_sub("palavroes_config", str(interaction.guild_id))
+        palavras = cfg.get("palavras_personalizadas", []) or []
+        if not palavras:
+            await interaction.response.send_message("📭 Nenhuma palavra customizada adicionada.", ephemeral=True)
+        else:
+            lista = "\n".join(f"• `{p}`" for p in palavras)
+            embed = discord.Embed(
+                title="📋 Palavras de Palavrões Customizadas",
+                description=lista,
+                color=discord.Color.gold()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class ModalAddPalavra(discord.ui.Modal, title='Adicionar Palavra de Palavrão'):
+    palavra = discord.ui.TextInput(label='Palavra', placeholder='Ex: palavra_proibida', required=True, max_length=50)
+
+    def __init__(self, guild_id, bot):
+        super().__init__()
+        self._guild_id = guild_id
+        self._bot = bot
+
+    async def on_submit(self, interaction):
+        palavra = self.palavra.value.strip().lower()
+        if len(palavra) < 2:
+            return await interaction.response.send_message("❌ A palavra precisa ter pelo menos 2 caracteres.", ephemeral=True)
+        cfg = ler_sub("palavroes_config", self._guild_id)
+        palavras = cfg.get("palavras_personalizadas", []) or []
+        if palavra in palavras:
+            return await interaction.response.send_message(f"⚠️ **{palavra}** já está na lista.", ephemeral=True)
+        palavras.append(palavra)
+        supabase.table("palavroes_config").upsert({
+            "guilda_id": self._guild_id,
+            "palavras_personalizadas": palavras,
+            "habilitado": True
+        }).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "palavroes")
+            await interaction.response.edit_message(embed=embed, view=view)
+
 
 class ModalNovaGuilda(discord.ui.Modal, title='Alterar Guilda FF'):
     novo_id = discord.ui.TextInput(label='Novo ID da Guilda FF', placeholder='Ex: 3054516545', required=True)
@@ -1025,6 +1245,7 @@ class Admin(commands.Cog):
             ("codigos_seguranca", "id_servidor"),
             ("verificacao_automatica_config", "guilda_id"),
             ("musica_config", "guilda_id"),
+            ("palavroes_config", "guilda_id"),
         ]
         
         apagados = []

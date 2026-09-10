@@ -181,6 +181,7 @@ class MusicPlayer:
         self.audio_source = None
         self.dj_id = None
         self.loop_current = False
+        self.funk_mode = False
         self._suppress_after = False
         self.play_started_at = None
         self._paused_at = None
@@ -198,6 +199,7 @@ class MusicPlayer:
     def clear(self):
         self.queue.clear()
         self.current_track = None
+        self.funk_mode = False
 
 
 class Musica(commands.Cog):
@@ -264,7 +266,7 @@ class Musica(commands.Cog):
         if str(canal_comandos).isdigit():
             canal = interaction.guild.get_channel(int(canal_comandos))
 
-        nome_canal = f"#{canal.name}" if canal else "canal de música configurado"
+        nome_canal = canal.mention if canal else "canal de música configurado"
         await self._responder(
             interaction,
             content=f"❌ Usa os comandos de música em {nome_canal}.",
@@ -469,8 +471,64 @@ class Musica(commands.Cog):
         player = self.get_player(guild_id)
         if player.loop_current and player.current_track:
             await self.start_playing(guild_id)
+        elif player.funk_mode:
+            await self._play_next_funk(guild_id)
         else:
             await self.play_next(guild_id)
+
+    async def _play_next_funk(self, guild_id):
+        player = self.get_player(guild_id)
+        vc = player.voice_client
+        if not vc or not vc.is_connected():
+            player.funk_mode = False
+            return
+
+        guild = self.bot.get_guild(int(guild_id))
+        searches = player.funk_searches or []
+
+        for attempt in range(3):
+            query = random.choice(searches) if searches else None
+            if not query:
+                break
+            results = await search_and_extract_stream(query)
+            if results:
+                track = Track(
+                    url=results['webpage_url'],
+                    title=results['title'],
+                    thumbnail=results['thumbnail'],
+                    duration=results['duration'],
+                    duration_str=results['duration_str'],
+                    provider=results['provider']
+                )
+                player.current_track = track
+                try:
+                    await self.start_playing(guild_id)
+                except Exception as e:
+                    print(f"[MUSICA] Erro ao tocar próximo funk: {e}")
+                    continue
+                music_channel = self._music_channel(guild) if guild else None
+                if music_channel:
+                    embed = discord.Embed(
+                        title="🎧 Próximo Funk",
+                        description=f"▶️ **{track.title}** — no ar!",
+                        color=discord.Color.dark_red()
+                    )
+                    try:
+                        await music_channel.send(embed=embed)
+                    except Exception:
+                        pass
+                return
+
+        player.funk_mode = False
+        try:
+            if vc and vc.is_connected():
+                await vc.disconnect()
+        except Exception:
+            pass
+        player.voice_client = None
+        player.current_track = None
+        player.dj_id = None
+        print(f"[MUSICA] Funk mode encerrado (pesquisas esgotadas).")
 
     async def play_next(self, guild_id):
         player = self.get_player(guild_id)
@@ -487,6 +545,7 @@ class Musica(commands.Cog):
                     pass
             player.voice_client = None
             player.current_track = None
+            player.funk_mode = False
             player.dj_id = None
             print(f"[MUSICA] Fila esgotada. Desconectado do servidor {guild_id}.")
 
@@ -785,6 +844,9 @@ class Musica(commands.Cog):
 
         player.clear()
         player.current_track = track
+        player.funk_mode = True
+        player.loop_current = False
+        player.funk_searches = pesquisas_funk
         await self.start_playing(interaction.guild_id)
         await self._anunciar_dj(interaction, reason="funk")
         if self._is_outside_channel(interaction):
@@ -898,6 +960,8 @@ class Musica(commands.Cog):
         embed.add_field(name="Volume", value=f"{int(player.volume * 100)}%", inline=True)
         if player.loop_current:
             embed.add_field(name="Loop", value="🔁 Ativado", inline=True)
+        if player.funk_mode:
+            embed.add_field(name="Modo", value="🎷 Funk Loop Ativo", inline=True)
         if player.current_track.thumbnail:
             embed.set_thumbnail(url=player.current_track.thumbnail)
         embed.set_footer(text="S.art Engine • Música")
@@ -1039,6 +1103,7 @@ class Musica(commands.Cog):
                     player.voice_client = None
                     player.current_track = None
                     player.queue.clear()
+                    player.funk_mode = False
                     player.dj_id = None
                     player.play_started_at = None
                     player._paused_at = None
