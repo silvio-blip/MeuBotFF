@@ -97,6 +97,7 @@ class ViewMenuPrincipal(discord.ui.View):
             discord.SelectOption(label="Economia", value="economia", emoji="💰", description="Moedas, recompensas e configurações"),
             discord.SelectOption(label="Música", value="musica", emoji="🎵", description="DJ, canal e permissões de música"),
             discord.SelectOption(label="Palavrões", value="palavroes", emoji="🚫", description="Auto-timeout por linguagem imprópria"),
+            discord.SelectOption(label="Embeds", value="embeds", emoji="🎨", description="Criar e gerir embeds personalizados"),
         ],
         custom_id="painel_menu_principal"
     )
@@ -405,6 +406,7 @@ def build_categoria(guild, cat):
     noti_cfg = ler_sub("notificacoes_config", guild_id)
     musica_cfg = ler_sub("musica_config", guild_id)
     palavroes_cfg = ler_sub("palavroes_config", guild_id)
+    embeds_cfg = ler_sub("embeds_config", guild_id)
 
     db_members = supabase.table("membros_verificados").select("id_discord").eq("id_servidor", guild_id).execute()
     member_count = len(db_members.data) if db_members.data else 0
@@ -428,6 +430,7 @@ def build_categoria(guild, cat):
             ("👋 Boas-Vindas", f"**Status:** {on_off(bv_cfg.get('habilitado', False))}\n📢 Canal: {safe_channel(guild, bv_cfg.get('canal_id')).mention if safe_channel(guild, bv_cfg.get('canal_id')) else '⚠️ Não definido'}", True),
             ("🛡️ Anti-Raid", f"**Status:** {on_off(raid_cfg.get('habilitado', False))}\n📊 Limite: `{raid_cfg.get('limite_joins', 5)}` joins/min\n⏱️ Lock: `{raid_cfg.get('duracao_lock', 5)}` min", True),
             ("🚫 Palavrões", f"**Status:** {on_off(palavroes_cfg.get('habilitado', False))}\n⏱️ Timeout: `{palavroes_cfg.get('duracao_timeout', 300)}`s", True),
+            ("🎨 Embeds", f"**Status:** {on_off(embeds_cfg.get('habilitado', False))}", True),
             ("🔔 Notificações", f"**Status:** {on_off(noti_cfg.get('habilitado', False))}\n🎮 FF News, 👤 Saídas, 📅 Temporada", True),
             ("📊 Estatísticas", f"**👥 Verificados:** `{member_count}` membros\n🏆 Ranking ativo\n🔄 Verificação automática", True),
         ]
@@ -733,6 +736,36 @@ def build_categoria(guild, cat):
         embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewPalavroes()
 
+    elif cat == "embeds":
+        embeds_on = embeds_cfg.get("habilitado", False)
+        try:
+            db_embeds = supabase.table("embed_configs").select("embed_id", "nome").eq("guilda_id", guild_id).execute()
+        except Exception:
+            db_embeds = None
+        embed_count = len(db_embeds.data) if db_embeds and db_embeds.data else 0
+        embed = discord.Embed(
+            title="🎨 Sistema de Embeds",
+            description="Construtor interativo de embeds personalizados.\n"
+                        "Cria, salva e envia embeds customizados com imagem, cor, campos, etc.",
+            color=discord.Color.from_rgb(255, 215, 0)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/0/2643.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(embeds_on), inline=True)
+        embed.add_field(name="💾 Embeds Salvos", value=f"`{embed_count}` no servidor", inline=True)
+        embed.add_field(name="⚠️ Requisito", value="Cargo Gestão ou Admin", inline=True)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value=(
+            "**Comandos:**\n"
+            "`/embed-criar` — Inicia o builder interativo\n"
+            "`/embed-listar` — Lista embeds salvos\n"
+            "`/embed-enviar` — Envia um embed salvo\n"
+            "`/embed-apagar` — Remove um embed salvo\n\n"
+            "**Ações disponíveis:**\n"
+            "🔄 **Ligar/Desligar** — Ativa/desativa o sistema"
+        ), inline=False)
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
+        return embed, ViewEmbeds()
+
     embed, view = build_categoria(guild, "main")
     return embed, view
 
@@ -898,15 +931,37 @@ class ModalAddPalavra(discord.ui.Modal, title='Adicionar Palavra de Palavrão'):
         if palavra in palavras:
             return await interaction.response.send_message(f"⚠️ **{palavra}** já está na lista.", ephemeral=True)
         palavras.append(palavra)
-        supabase.table("palavroes_config").upsert({
-            "guilda_id": self._guild_id,
-            "palavras_personalizadas": palavras,
-            "habilitado": True
-        }).execute()
+        try:
+            supabase.table("palavroes_config").upsert({
+                "guilda_id": self._guild_id,
+                "palavras_personalizadas": palavras,
+                "habilitado": True
+            }).execute()
+        except Exception as e:
+            return await interaction.response.send_message(
+                f"❌ Erro na base de dados. A coluna `palavras_personalizadas` pode não existir.\nDetalhe: {str(e)[:200]}",
+                ephemeral=True
+            )
         guild = self._bot.get_guild(int(self._guild_id))
         if guild:
             embed, view = build_categoria(guild, "palavroes")
             await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ViewEmbeds(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.select(placeholder="📂 Voltar ao menu principal...", options=[discord.SelectOption(label="Menu Principal", value="main", emoji="📋")], custom_id="embeds_back")
+    async def back(self, interaction, select):
+        embed, view = build_categoria(interaction.guild, "main")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="embeds_toggle", row=1)
+    async def btn_toggle(self, interaction, button):
+        novo = toggle_config("embeds_config", str(interaction.guild_id))
+        status = "ativado" if novo else "desativado"
+        await interaction.response.send_message(f"✅ Sistema de embeds **{status}**.", ephemeral=True)
 
 
 class ModalNovaGuilda(discord.ui.Modal, title='Alterar Guilda FF'):
@@ -1246,6 +1301,8 @@ class Admin(commands.Cog):
             ("verificacao_automatica_config", "guilda_id"),
             ("musica_config", "guilda_id"),
             ("palavroes_config", "guilda_id"),
+            ("embeds_config", "guilda_id"),
+            ("embed_configs", "guilda_id"),
         ]
         
         apagados = []

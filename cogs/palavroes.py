@@ -244,11 +244,17 @@ class Palavroes(commands.Cog):
             return await interaction.followup.send(f"⚠️ **{palavra}** já está na lista de palavrões.", ephemeral=True)
 
         palavras.append(palavra)
-        supabase.table("palavroes_config").upsert({
-            "guilda_id": guild_id,
-            "palavras_personalizadas": palavras,
-            "habilitado": True
-        }).execute()
+        try:
+            supabase.table("palavroes_config").upsert({
+                "guilda_id": guild_id,
+                "palavras_personalizadas": palavras,
+                "habilitado": True
+            }).execute()
+        except Exception as e:
+            print(f"[PALAVROES] Erro ao salvar: {e}")
+            return await interaction.followup.send(
+                f"❌ Erro no banco de dados. Contacta um administrador.\nDetalhe: {str(e)[:200]}", ephemeral=True
+            )
         self._clear_cache(guild_id)
 
         embed = discord.Embed(
@@ -276,11 +282,17 @@ class Palavroes(commands.Cog):
             return await interaction.followup.send(f"⚠️ **{palavra}** não está na lista de palavrões.", ephemeral=True)
 
         palavras.remove(palavra)
-        supabase.table("palavroes_config").upsert({
-            "guilda_id": guild_id,
-            "palavras_personalizadas": palavras,
-            "habilitado": True
-        }).execute()
+        try:
+            supabase.table("palavroes_config").upsert({
+                "guilda_id": guild_id,
+                "palavras_personalizadas": palavras,
+                "habilitado": True
+            }).execute()
+        except Exception as e:
+            print(f"[PALAVROES] Erro ao remover: {e}")
+            return await interaction.followup.send(
+                f"❌ Erro no banco de dados. Contacta um administrador.\nDetalhe: {str(e)[:200]}", ephemeral=True
+            )
         self._clear_cache(guild_id)
 
         embed = discord.Embed(

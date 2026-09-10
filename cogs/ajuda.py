@@ -19,6 +19,7 @@ PAGINAS = {
         "🛡️ **Anti-Raid** — Proteção contra joins\n"
         "🔔 **Notificações** — Alertas do FF\n"
         "🚫 **Palavrões** — Auto-timeout por linguagem imprópria\n"
+        "🎨 **Embeds** — Cria embeds personalizados no servidor\n"
         "🎵 **Música** — Sistema DJ com bloqueio de canal\n"
         "⚙️ **Admin** — Configuração do servidor\n\n"
         "💡 *Seleciona uma categoria abaixo para ver detalhes, exemplos e como usar cada comando.*"),
@@ -299,6 +300,34 @@ PAGINAS = {
           "**`/listar-palavras`** — Lista palavras customizadas\n\n"
           "⚠️ **Importante:**\n"
           "• O timeout pode ser dobrado para reincidentes."),
+
+    "embeds": ("🎨 Embed Builder", discord.Color.from_rgb(255, 215, 0),
+          "**Construtor interativo de embeds personalizados** — Apenas Cargo Gestão e Admin.\n\n"
+          "**Como funciona:**\n"
+          "• Admin/Gestão usa `/embed-criar` → abre um painel interativo\n"
+          "• Edita cada propriedade via botões → modais\n"
+          "• Faz preview, envia para um canal ou salva para reutilizar\n\n"
+          "**Propriedades editáveis:**\n"
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+          "🏷️ **Título** — Texto do título\n"
+          "📝 **Descrição** — Texto principal (multilinha)\n"
+          "🎨 **Cor** — Hex (ex: FFD700)\n"
+          "🖼️ **Thumbnail** — Imagem pequena (URL)\n"
+          "🖼️ **Imagem** — Imagem grande (URL)\n"
+          "🖼️ **Banner/Autor** — Ícone + nome do autor\n"
+          "🔖 **Footer** — Texto + ícone\n"
+          "📊 **Campos** — Nome/Valor/Inline (até 25)\n"
+          "⏱️ **Timestamp** — Mostra data/hora\n\n"
+          "**Comandos:**\n"
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+          "**`/embed-criar`** — Abre o builder interativo\n"
+          "**`/embed-listar`** — Lista embeds salvos\n"
+          "**`/embed-enviar`** — Envia um embed salvo para um canal\n"
+          "**`/embed-apagar`** — Remove um embed salvo\n\n"
+          "**Dicas:**\n"
+          "• Usa `/imagem` para fazer upload de imagens (ImgBB) e obter URLs\n"
+          "• Os embeds salvos ficam disponíveis 24/7\n"
+          "• O builder expira após 5 minutos de inatividade"),
 }
 
 ORDEM = list(PAGINAS.keys())

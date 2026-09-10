@@ -30,6 +30,7 @@ class MeuBot(commands.Bot):
         await self.load_extension('cogs.boas_vindas')
         await self.load_extension('cogs.anti_raid')
         await self.load_extension('cogs.palavroes')
+        await self.load_extension('cogs.embeds')
         await self.load_extension('cogs.ranking')
         await self.load_extension('cogs.torneios')
         await self.load_extension('cogs.notificacoes')

@@ -176,3 +176,33 @@ await self.load_extension('cogs.embeds')
 4. Teste permissoes: usuário sem cargo gestão não consegue criar
 5. Teste upload de imagem via attachment → ImgBB
 6. Teste admin panel: dropdown, view, toggle
+
+## Estado Atual (implementado)
+
+### Concluído
+- `scripts/embeds_setup.sql` — migration `embed_configs` + `embeds_config` (tabela já existe)
+- `database_tables.sql` — já contém `embed_configs` (linhas 91-111) e `embeds_config` (linhas 84-89)
+- `cogs/embeds.py` — Cog completo com:
+  - `EmbedBuilderView` (14 botões: Título, Descrição, Cor, Thumbnail, Imagem, Banner, Autor, Footer, Timestamp, Campos, Preview, Enviar, Salvar, Limpar)
+  - `ModalTexto` / `ModalEmbedCor` / `ModalEmbedURL` / `ModalEmbedAutor` / `ModalEmbedFooter` / `ModalCampo` — modais para cada propriedade
+  - `ModalNomeEmbed` — salva embed no DB com `gerar_embed_id()`
+  - `FieldManagerView` — gerencia campos (máx 4 visíveis, botões dinâmicos via `clear_items()`, `ModalCampo` passa `field_manager_view`)
+  - `SendEmbedView` — view interativa para `/embed-enviar` (dropdown de embeds + select de canal)
+  - `build_embed()` — constrói `discord.Embed` a partir de `embed_data` dict
+  - `gerar_embed_id()` — gera ID único
+  - 5 comandos: `/embed-criar`, `/embed-listar`, `/embed-enviar`, `/embed-salvar` (via modal no builder), `/embed-apagar`
+  - Error handling: try/except em todos os calls ao Supabase (`embed_listar`, `embed_enviar`/`SendEmbedView`, `embed_apagar`, `ModalNomeEmbed`)
+  - `_check_gestao` — permission helper (admin, owner, cargo gestão)
+  - `_NullLogger` usado no yt-dlp import (integrado com `cogs.player`)
+- `cogs/admin.py` — Integração admin panel completa:
+  - Dropdown "🎨 Embeds" em `ViewMenuPrincipal` (linha 100)
+  - `build_categoria` branch `"embeds"` (linha 739) — status, count, help, return `ViewEmbeds()`
+  - `ViewEmbeds` (linha 942) — toggle on/off via `toggle_config("embeds_config", guild_id)`
+  - Error handling no db call do branch `embeds`
+- `main.py` — registra `cogs.embeds` (linha 33)
+- `cogs/ajuda.py` — página "🎨 Embed Builder" (compila OK)
+
+### Tarefas Pendentes
+- Aplicar migrations no Supabase (`scripts/embeds_setup.sql`, `scripts/musica_setup.sql`, `scripts/palavroes_setup.sql`) — TCP não acessível no sandbox
+- Criar `cookies.txt` com cookies YouTube reais no servidor de produção
+- Adicionar `embed_configs` e `embeds_config` ao cleanup em `remover_servidor` em `cogs/admin.py`
