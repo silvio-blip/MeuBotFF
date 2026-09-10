@@ -5,6 +5,7 @@ import asyncio
 import random
 import shutil
 import time
+import os
 import yt_dlp
 from database import supabase
 
@@ -44,42 +45,56 @@ def progress_bar(position, duration, length=20):
     bar = "█" * filled + "░" * (length - filled)
     return f"[{bar}]"
 
+
+class _NullLogger:
+    def debug(self, msg): pass
+    def info(self, msg): pass
+    def warning(self, msg): pass
+    def error(self, msg): pass
+
+
+_COOKIES_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "cookies.txt")
+
+
+def _yt_opts():
+    opts = BASE_YDL_OPTIONS.copy()
+    if os.path.exists(_COOKIES_FILE):
+        opts['cookiefile'] = _COOKIES_FILE
+    return opts
+
 BASE_YDL_OPTIONS = {
     'format': 'bestaudio/best',
     'noplaylist': True,
     'quiet': True,
     'no_warnings': True,
-    'nocheckcertificate': True,
+    'noprogress': True,
     'ignoreerrors': True,
+    'nocheckcertificate': True,
     'source_address': '0.0.0.0',
     'socket_timeout': 15,
     'concurrent_fragment_downloads': 1,
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'ios']
-        }
-    }
+    'js_runtimes': {'node': {}},
+    'logger': _NullLogger(),
 }
+
 async def search_and_extract_stream(query):
     loop = asyncio.get_running_loop()
 
     if query.startswith("http"):
-        configs = [{'opts': BASE_YDL_OPTIONS.copy(), 'target': query, 'name': 'Link Direto'}]
+        configs = [{'opts': _yt_opts(), 'target': query, 'name': 'Link Direto'}]
     else:
-        yt_mobile_opts = BASE_YDL_OPTIONS.copy()
+        yt_mobile_opts = _yt_opts()
         yt_mobile_opts['extractor_args'] = {'youtube': {'player_client': ['android', 'ios']}}
 
-        yt_tv_opts = BASE_YDL_OPTIONS.copy()
+        yt_tv_opts = _yt_opts()
         yt_tv_opts['extractor_args'] = {'youtube': {'player_client': ['tvhtml5', 'web_embedded']}}
 
-        sc_opts = BASE_YDL_OPTIONS.copy()
-        bc_opts = BASE_YDL_OPTIONS.copy()
+        sc_opts = _yt_opts()
 
         configs = [
             {'opts': yt_mobile_opts, 'target': f"ytsearch1:{query}", 'name': 'YouTube (Mobile)'},
             {'opts': yt_tv_opts, 'target': f"ytsearch1:{query}", 'name': 'YouTube (TV)'},
             {'opts': sc_opts, 'target': f"scsearch1:{query}", 'name': 'SoundCloud'},
-            {'opts': bc_opts, 'target': f"bcsearch1:{query}", 'name': 'Bandcamp'}
         ]
 
     for config in configs:
@@ -360,7 +375,7 @@ class Musica(commands.Cog):
                 await vc.move_to(channel)
         else:
             try:
-                vc = await channel.connect()
+                vc = await channel.connect(reconnect=True, timeout=20.0)
             except discord.ClientException:
                 vc = interaction.guild.voice_client
 
