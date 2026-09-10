@@ -54,8 +54,12 @@ BASE_YDL_OPTIONS = {
     'source_address': '0.0.0.0',
     'socket_timeout': 15,
     'concurrent_fragment_downloads': 1,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios']
+        }
+    }
 }
-
 async def search_and_extract_stream(query):
     loop = asyncio.get_running_loop()
 
