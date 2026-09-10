@@ -57,3 +57,12 @@ CREATE TABLE IF NOT EXISTS economia_daily (
   PRIMARY KEY (user_id, servidor_id, data)
 );
 ALTER TABLE economia_daily DISABLE ROW LEVEL SECURITY;
+
+-- Sistema de música (DJ, canal de comandos, cargo musica)
+CREATE TABLE IF NOT EXISTS musica_config (
+  guilda_id TEXT PRIMARY KEY,
+  canal_comandos TEXT,
+  cargo_musica_id TEXT,
+  habilitado BOOLEAN DEFAULT TRUE
+);
+ALTER TABLE musica_config DISABLE ROW LEVEL SECURITY;

@@ -17,6 +17,7 @@ PAGINAS = {
         "👋 **Boas-Vindas** — Embed personalizada\n"
         "🛡️ **Anti-Raid** — Proteção contra joins\n"
         "🔔 **Notificações** — Alertas do FF\n"
+        "🎵 **Música** — Sistema DJ com bloqueio de canal\n"
         "⚙️ **Admin** — Configuração do servidor\n\n"
         "💡 *Seleciona uma categoria abaixo para ver detalhes, exemplos e como usar cada comando.*"),
 
@@ -199,6 +200,39 @@ PAGINAS = {
         "• Cargo de Gestão (quem usa comandos mod)\n"
         "• Warns, Boas-Vindas, Anti-Raid, Notificações\n"
         "• Verificação Automática (diária)"),
+
+    "musica": ("🎵 Música", discord.Color.from_rgb(255, 50, 80),
+        "**Sistema de música com DJ e bloqueio de canal.**\n\n"
+        "**Como funciona:**\n"
+        "• O admin define um **canal de texto** onde os comandos de música funcionam\n"
+        "• Quem toca a primeira música vira o **DJ/Líder**\n"
+        "• Se o DJ sai mas há gente no VC, a liderança passa para outro\n"
+        "• Um **cargo de música** pode controlar a qualquer momento, mesmo se não for DJ\n"
+        "• Se ninguém está no VC, o bot desconecta automaticamente\n\n"
+        "**Fluxo de uso:**\n"
+        "1. Admin: `/painel` → Música → Definir Canal + Cargo DJ\n"
+        "2. Qualquer um: `/play` ou `/add_fila` com o nome/link\n"
+        "3. DJ controla: `/pular`, `/pause`, `/resume`, `/volume`\n"
+        "4. Info: `/np` (agora a tocar), `/fila` (próximas)\n"
+        "5. DJ: `/stop` ou `/disconnect` para parar\n\n"
+        "**Comandos:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "**`/play`** — Toca uma música (troca a atual)\n"
+        "**`/add_fila`** — Adiciona à fila sem parar\n"
+        "**`/funk`** — Toca um funk aleatório\n"
+        "**`/pular`** — Para a atual, vai para a próxima\n"
+        "**`/pause` / `/resume`** — Pausa / retoma\n"
+        "**`/volume 0-100`** — Ajusta o volume\n"
+        "**`/np`** — Mostra a música atual\n"
+        "**`/fila`** — Lista a fila de músicas\n"
+        "**`/loop`** — Repete a música atual\n"
+        "**`/shuffle`** — Embaralha a fila\n"
+        "**`/clear`** — Limpa a fila\n"
+        "**`/stop` / `/disconnect`** — Para e desconecta o bot\n\n"
+        "⚠️ **Permissões:**\n"
+        "• Comandos só funcionam no canal de texto configurado\n"
+        "• Controle (pular, stop, etc.) exige ser DJ ou ter o cargo de música\n"
+        "• Dono/Admin sempre têm acesso"),
 }
 
 ORDEM = list(PAGINAS.keys())

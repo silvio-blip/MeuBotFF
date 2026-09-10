@@ -15,3 +15,10 @@ python-dotenv>=1.0.0        # Carrega variáveis do arquivo .env
 
 # Processamento de imagem
 Pillow>=10.0.0               # Geração de cards de perfil (imagine, fundo, etc.)
+
+# Música
+# wavelink removido — mantém yt-dlp + FFmpegPCMAudio (ver scripts/musica_setup.sql)
+
+# Audio/FFmpeg
+ffmpeg-python                # Para reprodução de áudio
+yt-dlp                       # Download de streams de YouTube/SoundCloud

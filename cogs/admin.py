@@ -31,16 +31,27 @@ def safe_role(guild, role_id):
 
 
 def tem_permissao_admin(interaction: discord.Interaction) -> bool:
-    if interaction.user.id == interaction.guild.owner_id:
-        return True
+    print(f"[PERMISSAO] Checking user {interaction.user.id} in guild {interaction.guild_id}")
+    print(f"[PERMISSAO] User roles: {[r.id for r in interaction.user.roles]}")
+    print(f"[PERMISSAO] guild_permissions: {interaction.user.guild_permissions}")
+    if interaction.guild.owner_id:
+        print(f"[PERMISSAO] guild.owner_id = {interaction.guild.owner_id}")
+        if interaction.user.id == interaction.guild.owner_id:
+            print("[PERMISSAO] User is guild owner")
+            return True
     if interaction.user.guild_permissions.administrator:
+        print("[PERMISSAO] User is admin")
         return True
+    print("[PERMISSAO] Falling back to Supabase check...")
     dados = supabase.table("servidores").select("cargo_gestao_id").eq("id_discord", str(interaction.guild_id)).execute()
+    print(f"[PERMISSAO] Supabase result: {dados.data}")
     if dados.data and dados.data[0].get("cargo_gestao_id"):
         cargo_gestao_id = int(dados.data[0]["cargo_gestao_id"])
         cargo_gestao = interaction.guild.get_role(cargo_gestao_id)
         if cargo_gestao and cargo_gestao in interaction.user.roles:
+            print(f"[PERMISSAO] User has cargo_gestao ({cargo_gestao_id})")
             return True
+    print("[PERMISSAO] No permissions granted")
     return False
 
 def safe_channel(guild, channel_id):
@@ -84,6 +95,7 @@ class ViewMenuPrincipal(discord.ui.View):
             discord.SelectOption(label="Estatísticas", value="stats", emoji="📊", description="Dados do servidor"),
             discord.SelectOption(label="Verificação Automática", value="verificacao", emoji="🔄", description="Remover cargo de quem saiu da guilda FF"),
             discord.SelectOption(label="Economia", value="economia", emoji="💰", description="Moedas, recompensas e configurações"),
+            discord.SelectOption(label="Música", value="musica", emoji="🎵", description="DJ, canal e permissões de música"),
         ],
         custom_id="painel_menu_principal"
     )
@@ -116,13 +128,21 @@ class ViewBase(discord.ui.View):
     async def btn_cargo(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o novo Cargo que os membros verificados recebem:**", view=SelectCargoComUpdate(str(interaction.guild_id), interaction.client, "base"), ephemeral=True)
 
-    @discord.ui.button(label="Alterar Canal de Logs", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="base_canal", row=2)
+    @discord.ui.button(label="Alterar Canal de Registro", style=discord.ButtonStyle.secondary, emoji="📋", custom_id="base_canal", row=2)
     async def btn_canal(self, interaction, button):
-        await interaction.response.send_message("👇 **Seleciona o Canal onde o bot envia os registos:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "servidores", "canal_id", "base"), ephemeral=True)
+        await interaction.response.send_message("👇 **Seleciona o Canal onde o bot registra verificações:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "servidores", "canal_id", "base"), ephemeral=True)
 
     @discord.ui.button(label="Alterar Cargo de Gestão", style=discord.ButtonStyle.primary, emoji="🛠️", custom_id="base_gestao", row=2)
     async def btn_gestao(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Cargo que os moderadores recebem:**", view=SelectCargoGestaoComUpdate(str(interaction.guild_id), interaction.client, "base"), ephemeral=True)
+
+    @discord.ui.button(label="Canal Saída Usuário", style=discord.ButtonStyle.secondary, emoji="🚪", custom_id="base_canal_saida", row=3)
+    async def btn_canal_saida(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa quando um membro sai do servidor:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_saida", "notificacoes"), ephemeral=True)
+
+    @discord.ui.button(label="Canal Desvinculamento", style=discord.ButtonStyle.secondary, emoji="🔗", custom_id="base_canal_desvinculo", row=3)
+    async def btn_canal_desvinculo(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa sobre desvinculamentos:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_desvinculo", "notificacoes"), ephemeral=True)
 
 class ViewWarns(discord.ui.View):
     def __init__(self):
@@ -214,7 +234,15 @@ class ViewNoti(discord.ui.View):
     async def btn_temp(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa sobre mudanças de temporada:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_temporada", "notificacoes"), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="noti_toggle", row=2)
+    @discord.ui.button(label="Canal Saída Usuário", style=discord.ButtonStyle.secondary, emoji="🚪", custom_id="noti_saida", row=3)
+    async def btn_saida(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o Canal onde o bot avisa quando um membro sai do servidor:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_saida", "notificacoes"), ephemeral=True)
+
+    @discord.ui.button(label="Canal Desvinculamento", style=discord.ButtonStyle.secondary, emoji="🔗", custom_id="noti_desvinculo", row=3)
+    async def btn_desvinculo(self, interaction, button):
+        await interaction.response.send_message("👇 **Selecciona o Canal onde o bot avisa sobre desvinculamentos:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "notificacoes_config", "canal_desvinculo", "notificacoes"), ephemeral=True)
+
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="noti_toggle", row=3)
     async def btn_toggle(self, interaction, button):
         toggle_config("notificacoes_config", str(interaction.guild_id))
         embed, view = build_categoria(interaction.guild, "notificacoes")
@@ -322,6 +350,43 @@ class ViewEconomia(discord.ui.View):
         embed, view = build_categoria(interaction.guild, "economia")
         await interaction.response.edit_message(embed=embed, view=view)
 
+class ViewMusica(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.select(placeholder="📂 Voltar ao menu principal...", options=[discord.SelectOption(label="Menu Principal", value="main", emoji="📋")], custom_id="musica_back")
+    async def back(self, interaction, select):
+        embed, view = build_categoria(interaction.guild, "main")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    @discord.ui.button(label="Definir Canal", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="musica_canal", row=1)
+    async def btn_canal(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o Canal onde os comandos de música funcionam e onde o bot posta:**", view=SelectCanalComUpdate(str(interaction.guild_id), interaction.client, "musica_config", "canal_comandos", "musica"), ephemeral=True)
+
+    @discord.ui.button(label="Cargo DJ", style=discord.ButtonStyle.primary, emoji="🎖️", custom_id="musica_cargo", row=1)
+    async def btn_cargo(self, interaction, button):
+        await interaction.response.send_message("👇 **Seleciona o Cargo que controla a música independentemente do DJ:**", view=SelectCargoMusicaComUpdate(str(interaction.guild_id), interaction.client), ephemeral=True)
+
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="musica_toggle", row=2)
+    async def btn_toggle(self, interaction, button):
+        toggle_config("musica_config", str(interaction.guild_id))
+        embed, view = build_categoria(interaction.guild, "musica")
+        await interaction.response.edit_message(embed=embed, view=view)
+
+class SelectCargoMusicaComUpdate(discord.ui.View):
+    def __init__(self, guild_id, bot):
+        super().__init__(timeout=300)
+        self._guild_id = guild_id
+        self._bot = bot
+
+    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="🎵 Seleciona o Cargo de Música...")
+    async def select(self, interaction, select):
+        supabase.table("musica_config").upsert({"guilda_id": self._guild_id, "cargo_musica_id": str(select.values[0].id)}).execute()
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "musica")
+            await interaction.response.edit_message(embed=embed, view=view)
+
 def build_categoria(guild, cat):
     guild_id = str(guild.id)
     dados = ler_config(guild_id)
@@ -337,6 +402,7 @@ def build_categoria(guild, cat):
     bv_cfg = ler_sub("boas_vindas_config", guild_id)
     raid_cfg = ler_sub("anti_raid_config", guild_id)
     noti_cfg = ler_sub("notificacoes_config", guild_id)
+    musica_cfg = ler_sub("musica_config", guild_id)
 
     db_members = supabase.table("membros_verificados").select("id_discord").eq("id_servidor", guild_id).execute()
     member_count = len(db_members.data) if db_members.data else 0
@@ -379,7 +445,7 @@ def build_categoria(guild, cat):
         embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
         embed.add_field(name="🛡️ Guilda FF", value=f"`{id_guilda}`", inline=True)
         embed.add_field(name="🎖️ Cargo Membro", value=cargo_atual.mention if cargo_atual else "⚠️ Não definido", inline=True)
-        embed.add_field(name="📢 Canal Logs", value=canal_atual.mention if canal_atual else "⚠️ Não definido", inline=True)
+        embed.add_field(name="📋 Canal Registro", value=canal_atual.mention if canal_atual else "⚠️ Não definido", inline=True)
         embed.add_field(name="🛠️ Cargo Gestão", value=cargo_gestao.mention if cargo_gestao else "⚠️ Não definido", inline=True)
         embed.add_field(name="👥 Verificados", value=f"`{member_count}` membros", inline=True)
         embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🛡️ **Alterar Guilda** — Muda o ID da guilda FF\n🎖️ **Alterar Cargo** — Muda o cargo dos membros\n📢 **Alterar Canal** — Muda o canal de logs\n🛠️ **Cargo Gestão** — Muda o cargo dos mods", inline=False)
@@ -452,6 +518,8 @@ def build_categoria(guild, cat):
         noti_atual = safe_channel(guild, noti_cfg.get('canal_atualizacoes'))
         noti_membros = safe_channel(guild, noti_cfg.get('canal_membros'))
         noti_temp = safe_channel(guild, noti_cfg.get('canal_temporada'))
+        noti_saida = safe_channel(guild, noti_cfg.get('canal_saida'))
+        noti_desvinculo = safe_channel(guild, noti_cfg.get('canal_desvinculo'))
         embed = discord.Embed(
             title="🔔 Notificações",
             description="Alertas automáticos sobre o Free Fire.\nO bot verifica e avisa sobre mudanças.",
@@ -463,7 +531,9 @@ def build_categoria(guild, cat):
         embed.add_field(name="🎮 Canal Atualizações", value=noti_atual.mention if noti_atual else "❌ Não definido", inline=False)
         embed.add_field(name="👤 Canal Membros Saíram", value=noti_membros.mention if noti_membros else "❌ Não definido", inline=False)
         embed.add_field(name="📅 Canal Temporada", value=noti_temp.mention if noti_temp else "❌ Não definido", inline=False)
-        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🔄 **Atualizações** — Canal para news do jogo\n👤 **Membros** — Canal para quem saiu da guilda\n📅 **Temporada** — Canal para mudanças de rank\n🔄 **Ligar/Desligar** — Ativa ou desativa as notificações", inline=False)
+        embed.add_field(name="🚪 Canal Saída Usuário", value=noti_saida.mention if noti_saida else "❌ Não definido", inline=False)
+        embed.add_field(name="🔗 Canal Desvinculamento", value=noti_desvinculo.mention if noti_desvinculo else "❌ Não definido", inline=False)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🔄 **Atualizações** — Canal para news do jogo\n👤 **Membros** — Canal para quem saiu da guilda\n📅 **Temporada** — Canal para mudanças de rank\n🚪 **Saída Usuário** — Canal para quando membros saem do servidor\n🔗 **Desvinculamento** — Canal para notificar sobre desvinculamentos\n🔄 **Ligar/Desligar** — Ativa ou desativa as notificações", inline=False)
         embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewNoti()
 
@@ -582,6 +652,39 @@ def build_categoria(guild, cat):
         embed.add_field(name="━━━━━━━━━━━━━━━━━━", value="**Ações disponíveis:**\n🔄 **Ligar/Desligar** — Ativa ou desativa a economia\n⚙️ **Configurar Recompensas** — Muda valores por ação\n📅 **Configurar Daily/Limite** — Muda valor do daily\n🏷️ **Nome da Moeda** — Altera o nome exibido", inline=False)
         embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
         return embed, ViewEconomia()
+
+    elif cat == "musica":
+        musica_on = musica_cfg.get("habilitado", True)
+        musica_canal = safe_channel(guild, musica_cfg.get("canal_comandos"))
+        musica_cargo = safe_role(guild, musica_cfg.get("cargo_musica_id"))
+        embed = discord.Embed(
+            title="🎵 Sistema de Música",
+            description="Sistema de música com controlo DJ, canal bloqueado e cargo de gestão.\n"
+                        "Configura onde o bot posta e quem pode controlar a música.",
+            color=discord.Color.from_rgb(88, 101, 242)
+        )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/821/821256.png")
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+        embed.add_field(name="📊 Status", value=on_off(musica_on), inline=True)
+        embed.add_field(name="📢 Canal Comandos", value=musica_canal.mention if musica_canal else "⚠️ Não definido", inline=True)
+        embed.add_field(name="🎖️ Cargo DJ", value=musica_cargo.mention if musica_cargo else "⚠️ Não definido", inline=True)
+        embed.add_field(name="━━━━━━━━━━━━━━━━━━", value=
+            "**Comandos Ativos:**\n"
+            "`/play` — Toca uma música (DJ ou cargo-música)\n"
+            "`/add_fila` — Adiciona à fila (aberto)\n"
+            "`/funk` — Toca um funk aleatório (DJ ou cargo-música)\n"
+            "`/pular` / `/pause` / `/resume` — Controlo de reprodução\n"
+            "`/stop` / `/disconnect` — Para e desconecta o bot\n"
+            "`/np` / `/fila` — Informação da sessão\n"
+            "`/volume` / `/loop` / `/shuffle` / `/clear` — Utilitários\n\n"
+            "**Ações disponíveis:**\n"
+            "📢 **Definir Canal** — Onde comandos funcionam e onde o bot posta\n"
+            "🎖️ **Cargo DJ** — Quem controla a música independentemente do DJ\n"
+            "🔄 **Ligar/Desligar** — Ativa ou desativa o sistema",
+            inline=False
+        )
+        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
+        return embed, ViewMusica()
 
     embed, view = build_categoria(guild, "main")
     return embed, view
@@ -815,7 +918,11 @@ class SelectCanalComUpdate(discord.ui.View):
 
     @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="📢 Seleciona o Canal...")
     async def select(self, interaction, select):
-        supabase.table(self._tabela).upsert({"guilda_id": self._guild_id, self._campo: str(select.values[0].id)}).execute()
+        campo_id = "id_discord" if self._tabela == "servidores" else "guilda_id"
+        if self._tabela == "servidores":
+            supabase.table(self._tabela).update({self._campo: str(select.values[0].id)}).eq(campo_id, self._guild_id).execute()
+        else:
+            supabase.table(self._tabela).upsert({campo_id: self._guild_id, self._campo: str(select.values[0].id)}).execute()
         guild = self._bot.get_guild(int(self._guild_id))
         if guild:
             embed, view = build_categoria(guild, self._cat)
@@ -872,10 +979,28 @@ class Admin(commands.Cog):
 
     @app_commands.command(name="painel", description="Abre o Painel de Controlo")
     async def painel(self, interaction):
-        if not tem_permissao_admin(interaction):
-            return await interaction.response.send_message("⛔ Apenas o Dono, Admins ou Gestão.", ephemeral=True)
-        embed, view = build_categoria(interaction.guild, "main")
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        print(f"[PAINEL] User {interaction.user.id} requesting /painel in guild {interaction.guild_id}")
+        await interaction.response.defer(ephemeral=True)
+        try:
+            tem_perm = tem_permissao_admin(interaction)
+            print(f"[PAINEL] tem_permissao_admin = {tem_perm}")
+            if not tem_perm:
+                print("[PAINEL] User lacks permission, returning silently")
+                return
+            print("[PAINEL] Building categoria embed...")
+            embed, view = build_categoria(interaction.guild, "main")
+            print(f"[PAINEL] Categoria built: embed={type(embed).__name__}, view={type(view).__name__}")
+            print("[PAINEL] Sending followup...")
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            print("[PAINEL] Followup sent successfully!")
+        except Exception as e:
+            print(f"[PAINEL] ERROR: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                await interaction.followup.send(f"❌ Erro: {e}", ephemeral=True)
+            except Exception:
+                pass
 
     @app_commands.command(name="remover_servidor", description="Apaga todos os dados do bot deste servidor no Supabase")
     async def remover_servidor(self, interaction):
@@ -899,6 +1024,7 @@ class Admin(commands.Cog):
             ("convites_config", "guilda_id"),
             ("codigos_seguranca", "id_servidor"),
             ("verificacao_automatica_config", "guilda_id"),
+            ("musica_config", "guilda_id"),
         ]
         
         apagados = []
@@ -922,7 +1048,7 @@ class Admin(commands.Cog):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
 async def setup(bot):
-    for v in [ViewMenuPrincipal(), ViewBase(), ViewWarns(), ViewBV(), ViewRaid(), ViewNoti(), ViewTorneios(), ViewVerificacao(), ViewEconomia()]:
+    for v in [ViewMenuPrincipal(), ViewBase(), ViewWarns(), ViewBV(), ViewRaid(), ViewNoti(), ViewTorneios(), ViewVerificacao(), ViewEconomia(), ViewMusica()]:
         bot.add_view(v)
     cog = Admin(bot)
     await bot.add_cog(cog)

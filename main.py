@@ -37,6 +37,7 @@ class MeuBot(commands.Bot):
         await self.load_extension('cogs.convites')
         await self.load_extension('cogs.economia')
         await self.load_extension('cogs.imagem')
+        await self.load_extension('cogs.player')
         self.tree.interaction_check = self.global_check
         if os.getenv("SYNC_COMMANDS", "true").lower() == "true":
             await self.tree.sync()
@@ -86,7 +87,7 @@ class MeuBot(commands.Bot):
         try:
             db_user = supabase.table("membros_verificados").select("id_discord").eq("id_discord", str(interaction.user.id)).eq("id_servidor", str(interaction.guild_id)).execute()
             if not db_user.data:
-                await interaction.response.send_message("⛔ **Acesso Negado!** Precisas de estar verificado (`/entrar`) para usar comandos.", ephemeral=True)
+                await interaction.followup.send("⛔ **Acesso Negado!** Precisas de estar verificado (`/entrar`) para usar comandos.", ephemeral=True)
                 return False
         except Exception as e:
             print(f"🚨 Erro no global_check (membros): {e}")
@@ -122,6 +123,24 @@ bot = MeuBot()
 @bot.event
 async def on_ready():
     print(f'🔥 Bot Online e a correr limpo: {bot.user}')
+
+@bot.command(name="sync")
+@commands.is_owner()
+async def sync(ctx):
+    print("[SYNC] Sincronizando comandos...")
+    try:
+        synced = await bot.tree.sync()
+        count = len(synced)
+        embed = discord.Embed(
+            title="✅ Comandos Sincronizados",
+            description=f"Sincronizados **{count}** comandos de barra (/).",
+            color=discord.Color.green()
+        )
+        await ctx.reply(embed=embed, ephemeral=True)
+        print(f"[SYNC] {count} comandos sincronizados com sucesso!")
+    except Exception as e:
+        print(f"[SYNC] ERRO: {e}")
+        await ctx.reply(f"❌ Erro na sincronização: {e}", ephemeral=True)
 
 @bot.event
 async def on_member_join(member: discord.Member):

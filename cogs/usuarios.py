@@ -474,16 +474,21 @@ class Usuarios(commands.Cog):
         if db_server.data:
             dados_server = db_server.data[0]
             cargo_id = int(dados_server.get("cargo_id") or 0)
-            canal_id = int(dados_server.get("canal_id") or 0)
-
-            canal_log = interaction.guild.get_channel(canal_id)
+            
+            canal_log = interaction.guild.get_channel(dados_server.get("canal_id")) if dados_server.get("canal_id") else None
+            canal_desvinculo = None
+            db_noti = supabase.table("notificacoes_config").select("canal_desvinculo").eq("guilda_id", id_servidor).execute()
+            if db_noti.data and db_noti.data[0].get("canal_desvinculo"):
+                canal_desvinculo = interaction.guild.get_channel(int(db_noti.data[0].get("canal_desvinculo")))
             
             if canal_log and old_log_id:
                 try:
+                    log_sart(f"🗑️ Tentando deletar cartão de {nick_ff} (msg_id={old_log_id}) do canal {canal_log.id}")
                     old_msg = await canal_log.fetch_message(int(old_log_id))
                     await old_msg.delete()
-                    log_sart(f"🗑️ Cartão de {nick_ff} removido do canal do Admin pelo /desvincular.")
-                except Exception:
+                    log_sart(f"✅ Cartão de {nick_ff} removido do canal do Admin pelo /desvincular.")
+                except Exception as e:
+                    log_sart(f"🚨 Erro deletando cartão: {e}")
                     pass
 
             cargo = interaction.guild.get_role(cargo_id)
@@ -493,7 +498,7 @@ class Usuarios(commands.Cog):
                 except discord.Forbidden:
                     pass
 
-            if canal_log:
+            if canal_desvinculo:
                 embed_saida = discord.Embed(
                     title="👋 Remoção de Registo",
                     description=f"O utilizador {interaction.user.mention} desvinculou a sua conta voluntariamente.",
@@ -502,7 +507,7 @@ class Usuarios(commands.Cog):
                 embed_saida.add_field(name="Nick FF", value=f"`{nick_ff}`", inline=True)
                 embed_saida.add_field(name="UID", value=f"`{uid_ff}`", inline=True)
                 embed_saida.set_footer(text="O cartão de membro antigo foi automaticamente apagado.")
-                await canal_log.send(embed=embed_saida)
+                await canal_desvinculo.send(embed=embed_saida)
 
         supabase.table("membros_verificados").delete().eq("id_discord", id_discord).eq("id_servidor", id_servidor).execute()
 

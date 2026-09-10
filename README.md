@@ -193,6 +193,49 @@ Quando deteta raid, bloqueia o servidor temporariamente e expulsa novos membros.
 
 ---
 
+### Música
+
+Sistema de música com controlo DJ, bloqueio de canal e cargo de gestão.
+
+| Comando | Descrição | Permissão |
+|---|---|---|
+| `/play` | Toca uma música (troca a atual) | DJ ou cargo-música |
+| `/add_fila` | Adiciona à fila sem parar | DJ ou cargo-música |
+| `/funk` | Toca um funk aleatório | DJ ou cargo-música |
+| `/pular` | Para a atual, vai para a próxima | DJ ou cargo-música |
+| `/pause` / `/resume` | Pausa / retoma | DJ ou cargo-música |
+| `/volume 0-100` | Ajusta o volume | DJ ou cargo-música |
+| `/np` | Mostra a música atual | Qualquer um no VC |
+| `/fila` | Lista a fila | Qualquer um no VC |
+| `/loop` | Repete a música atual | DJ ou cargo-música |
+| `/shuffle` | Embaralha a fila | DJ ou cargo-música |
+| `/clear` | Limpa a fila | DJ ou cargo-música |
+| `/stop` / `/disconnect` | Para e desconecta | DJ ou cargo-música |
+
+**Sistema DJ:**
+- O utilizador que inicia a música vira o DJ/Líder
+- Se o DJ sai do canal de voz mas outros ficam, a liderança passa para o primeiro membro restante
+- Se o canal de voz fica vazio, o bot desconecta automaticamente
+- O bot pode estar inativo (sem tocar) e alguém que tocar vira o DJ
+
+**Configuração (via `/painel` → Música):**
+- 📢 **Canal Comandos** — onde os comandos funcionam e o bot posta
+- 🎖️ **Cargo DJ** — quem controla a música independentemente do DJ atual
+- 🔄 **Ligar/Desligar** — ativa/desativa o sistema
+
+**Configuração avançada:**
+```
+musica_config (tabela Supabase):
+  guilda_id        — ID do servidor
+  canal_comandos   — ID do canal de texto para comandos
+  cargo_musica_id  — ID do cargo que controla a música
+  habilitado       — booleano (ativo?)
+```
+
+**Dependências:** `yt-dlp` + `ffmpeg` (FFmpeg deve estar no PATH do sistema).
+
+---
+
 ### Dados Pessoais
 
 Durante o `/entrar`, o bot pede:
@@ -212,6 +255,7 @@ O painel é um menu interativo com botões para configurar tudo:
 - **Boas-Vindas** — Mensagem, canal, toggle
 - **Anti-Raid** — Limites, canal de alertas, toggle
 - **Notificações** — Canais de atualizações, membros, temporada, toggle
+- **Música** — Canal de comandos, cargo DJ, toggle
 - **Torneios** — Canal de vitórias
 - **Ranking** — Top 5 e comandos
 - **Estatísticas** — Resumo do servidor
@@ -231,7 +275,13 @@ MeuBotFF/
 ├── capa do bot.png      # Logo do bot
 ├── .env.example         # Template de variáveis
 ├── scripts/
-│   └── add_genero_idade.sql  # SQL para adicionar colunas de gênero/idade
+│   ├── add_genero_idade.sql
+│   ├── economia_setup.sql
+│   ├── economia_migration.sql
+│   ├── add_moedas.sql
+│   ├── migration_notificacoes_canais.sql
+│   ├── verificacao_automatica.sql
+│   └── musica_setup.sql    # Schema do sistema de música
 └── cogs/
     ├── admin.py         # Configurar, Painel
     ├── usuarios.py      # Entrar, Desvincular, Perfil
@@ -244,6 +294,8 @@ MeuBotFF/
     ├── anti_raid.py     # Proteção raid
     ├── pesquisa.py      # Pesquisar jogadores
     ├── convites.py      # Sistema de convites
+    ├── player/          # Música (DJ, bloqueio de canal, yt-dlp)
+    │   └── __init__.py  # Cog Musica + comandos de música
     └── ajuda.py         # Comando /ajuda
 ```
 
