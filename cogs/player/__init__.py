@@ -375,7 +375,7 @@ class Musica(commands.Cog):
                 await vc.move_to(channel)
         else:
             try:
-                vc = await channel.connect(reconnect=True, timeout=20.0)
+                vc = await channel.connect(reconnect=True, timeout=30.0, self_deaf=True)
             except discord.ClientException:
                 vc = interaction.guild.voice_client
 
