@@ -294,6 +294,7 @@ PAGINAS = {
          "🎖️ **Cargos Isentos** — Quem não leva timeout\n"
          "📵 **Canais Isentos** — Onde o filtro não ativa\n"
           "🔄 **Ligar/Desligar** — Ativa ou desativa o sistema\n\n"
+          "**`/mutar @membro [duracao]`** — Silencia membro (padrão: 300s, Cargo Gestão)\n"
           "**`/desmutar @membro`** — Remove timeout (Cargo Gestão)\n"
           "**`/add-palavra <palavra>`** — Adiciona palavra customizada (Cargo Gestão)\n"
           "**`/remover-palavra`** — Remove palavra (autocomplete, Cargo Gestão)\n"

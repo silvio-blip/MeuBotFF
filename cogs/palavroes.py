@@ -91,6 +91,7 @@ class Palavroes(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._config_cache = {}
+        self._warnings_cache = {}
 
     def _get_config(self, guild_id):
         if guild_id not in self._config_cache:
@@ -99,6 +100,35 @@ class Palavroes(commands.Cog):
 
     def _clear_cache(self, guild_id):
         self._config_cache.pop(guild_id, None)
+        self._warnings_cache.pop(guild_id, {})
+
+    def _get_warning_count(self, guild_id, user_id):
+        key = str(guild_id)
+        if key not in self._warnings_cache:
+            self._warnings_cache[key] = {}
+        return self._warnings_cache[key].get(str(user_id), 0)
+
+    def _set_warning_count(self, guild_id, user_id, count):
+        key = str(guild_id)
+        if key not in self._warnings_cache:
+            self._warnings_cache[key] = {}
+        self._warnings_cache[key][str(user_id)] = count
+        try:
+            supabase.table("palavras_warnings").upsert({
+                "guilda_id": key,
+                "user_id": str(user_id),
+                "contador": count
+            }).execute()
+        except Exception as e:
+            print(f"[PALAVROES] Warning cache persist error: {e}")
+
+    def _reset_warning_count(self, guild_id, user_id):
+        key = str(guild_id)
+        self._warnings_cache.pop(key, {}).pop(str(user_id), None)
+        try:
+            supabase.table("palavras_warnings").delete().eq("guilda_id", key).eq("user_id", str(user_id)).execute()
+        except Exception as e:
+            print(f"[PALAVROES] Warning reset error: {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -124,7 +154,7 @@ class Palavroes(commands.Cog):
                 if excluir_cargos & member_role_ids:
                     return
 
-            if str(message.channel_id) in excluir_canais:
+            if str(message.channel.id) in excluir_canais:
                 return
 
             palavras_personalizadas = cfg.get("palavras_personalizadas", []) or []
@@ -132,22 +162,57 @@ class Palavroes(commands.Cog):
             if not detected:
                 return
 
-            if cfg.get("deletar_mensagem", True):
+            avisos_antes = cfg.get("avisos_antes_timeout", 0) or 0
+            aviso_canal = cfg.get("aviso_canal", False)
+            deletar = cfg.get("deletar_mensagem", True)
+
+            if deletar:
                 try:
                     await message.delete()
                 except (discord.Forbidden, discord.HTTPException):
                     pass
 
+            nome_membro = getattr(member, 'display_name', str(member))
+
+            # Sistema de avisos antes do timeout
+            if avisos_antes > 0:
+                warning_count = self._get_warning_count(guild_id, member.id)
+                warning_count += 1
+                self._set_warning_count(guild_id, member.id, warning_count)
+                remaining = avisos_antes - warning_count + 1
+
+                if remaining > 0:
+                    # Ainda não chegou ao limite, avisa apenas
+                    if aviso_canal:
+                        embed_warning = discord.Embed(
+                            title=f"⚠️ Aviso ({warning_count}/{avisos_antes})",
+                            description=f"**{nome_membro}**, evita usar linguagem imprópria.\n"
+                                        f"Palavra detectada: `{palavra}`\n"
+                                        f"Mais **{remaining}** aviso(s) = timeout de `{cfg.get('duracao_timeout', 300)}s`.",
+                            color=discord.Color.orange()
+                        )
+                        if cfg.get("aviso_canal", False):
+                            try:
+                                await message.channel.send(embed=embed_warning, delete_after=15)
+                            except (discord.Forbidden, discord.HTTPException):
+                                pass
+                    return
+
+                # Limite de avisos atingido, aplica timeout
+                self._reset_warning_count(guild_id, member.id)
+            else:
+                # Sem avisos configurados, timeout imediato
+                pass
+
             duracao = cfg.get("duracao_timeout", 300)
             try:
                 await member.timeout(
-                    until=discord.utils.utcnow() + timedelta(seconds=duracao),
+                    discord.utils.utcnow() + timedelta(seconds=duracao),
                     reason=f"Palavrão detectado: '{palavra}'"
                 )
             except (discord.Forbidden, discord.HTTPException) as e:
                 print(f"[PALAVROES] Não consegui timeout em {message.guild.name}: {e}")
 
-            nome_membro = getattr(member, 'display_name', str(member))
             embed = discord.Embed(
                 title="🚫 Conteúdo Inapropriado",
                 description=(
@@ -159,7 +224,7 @@ class Palavroes(commands.Cog):
             embed.add_field(name="⚠️ Palavra detectada", value=f"`{palavra}`", inline=False)
             embed.set_footer(text="Novo palavrão = timeout dobrado.")
 
-            if cfg.get("aviso_canal", False):
+            if aviso_canal:
                 try:
                     await message.channel.send(embed=embed, delete_after=15)
                 except (discord.Forbidden, discord.HTTPException):
@@ -175,7 +240,7 @@ class Palavroes(commands.Cog):
                             f"**Membro:** {member.mention}\n"
                             f"**Canal:** {message.channel.mention}\n"
                             f"**Duração:** `{duracao}s`\n"
-                            f"**Conteúdo:** {message.content[:200]}"
+                            f"**Conteúdo:** {message.content[:200] if deletar else '(mensagem apagada)'}"
                         ),
                         color=discord.Color.dark_red(),
                         timestamp=datetime.now(timezone.utc)
@@ -209,7 +274,7 @@ class Palavroes(commands.Cog):
             return await interaction.followup.send(f"✅ **{membro.display_name}** não está silenciado.", ephemeral=True)
 
         try:
-            await membro.timeout(until=None, reason=f"Timeout removido por {interaction.user.display_name}")
+            await membro.timeout(None, reason=f"Timeout removido por {interaction.user.display_name}")
             embed = discord.Embed(
                 title="🔓 Timeout Removido",
                 description=f"**{membro.mention}** teve o silenciamento removido por {interaction.user.mention}.",
@@ -221,6 +286,38 @@ class Palavroes(commands.Cog):
             await interaction.followup.send("❌ Não tenho permissão para remover o timeout.", ephemeral=True)
         except discord.HTTPException as e:
             await interaction.followup.send(f"❌ Erro ao remover timeout: {e}", ephemeral=True)
+
+    @app_commands.command(name="mutar", description="Silencia um membro por X segundos (Cargo Gestão)")
+    @app_commands.describe(membro="O membro a silenciar", duracao="Duração do timeout em segundos (padrão: 300)")
+    async def mutar_cmd(self, interaction: discord.Interaction, membro: discord.Member, duracao: int = 300):
+        await interaction.response.defer(ephemeral=True)
+
+        is_admin = interaction.user.guild_permissions.administrator or interaction.user.id == interaction.guild.owner_id
+        is_gestao = await verificar_permissao_gestao(interaction, supabase)
+        if not is_admin and not is_gestao:
+            return await interaction.followup.send("⛔ Apenas Gestão ou Administradores podem usar este comando.", ephemeral=True)
+
+        if membro.guild_permissions.administrator or membro.id == interaction.guild.owner_id:
+            return await interaction.followup.send("❌ Não podes silenciar admins ou o dono do servidor.", ephemeral=True)
+
+        if duracao < 1 or duracao > 2419200:
+            return await interaction.followup.send("❌ A duração deve ser entre 1 segundo e 28 dias (2419200s).", ephemeral=True)
+
+        try:
+            until = discord.utils.utcnow() + timedelta(seconds=duracao)
+            await membro.timeout(until, reason=f"Timeout aplicado por {interaction.user.display_name} ({duracao}s)")
+            embed = discord.Embed(
+                title="🔇 Membro Silenciado",
+                description=f"**{membro.mention}** foi silenciado por **{duracao}s**\npelo: {interaction.user.mention}",
+                color=discord.Color.dark_red()
+            )
+            embed.set_footer(text=f"ID: {membro.id}")
+            await interaction.followup.send(embed=embed)
+            print(f"[PALAVROES] {interaction.user.display_name} mutou {membro.display_name} por {duracao}s em {interaction.guild.name}")
+        except discord.Forbidden:
+            await interaction.followup.send("❌ Não tenho permissão para aplicar timeout.", ephemeral=True)
+        except discord.HTTPException as e:
+            await interaction.followup.send(f"❌ Erro ao aplicar timeout: {e}", ephemeral=True)
 
     @app_commands.command(name="add-palavra", description="Adiciona uma palavra à lista de palavrões (Cargo Gestão)")
     @app_commands.describe(palavra="A palavra a adicionar")

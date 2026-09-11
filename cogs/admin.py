@@ -695,6 +695,7 @@ def build_categoria(guild, cat):
     elif cat == "palavroes":
         pp_on = palavroes_cfg.get("habilitado", False)
         pp_timeout = palavroes_cfg.get("duracao_timeout", 300)
+        pp_avisos = palavroes_cfg.get("avisos_antes_timeout", 0) or 0
         pp_canal = safe_channel(guild, palavroes_cfg.get("canal_alertas"))
         pp_cargos = palavroes_cfg.get("excluir_cargos", []) or []
         pp_canais = palavroes_cfg.get("excluir_canais", []) or []
@@ -720,6 +721,7 @@ def build_categoria(guild, cat):
         embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
         embed.add_field(name="📊 Status", value=on_off(pp_on), inline=True)
         embed.add_field(name="⏱️ Timeout", value=f"`{pp_timeout}s`", inline=True)
+        embed.add_field(name="⚠️ Avisos", value=f"`{pp_avisos}` antes do timeout", inline=True)
         embed.add_field(name="🗑️ Deletar Mensagem", value=on_off(pp_deletar), inline=True)
         embed.add_field(name="📢 Avisar no Canal", value=on_off(pp_aviso), inline=True)
         embed.add_field(name="🚨 Canal Alertas", value=pp_canal.mention if pp_canal else "⚠️ Não definido", inline=True)
@@ -728,12 +730,15 @@ def build_categoria(guild, cat):
         embed.add_field(name="━━━━━━━━━━━━━━━━━━", value=(
             "**Ações disponíveis:**\n"
             "⚙️ **Configurar Timeout** — Duração do silenciamento\n"
+            "🔢 **Configurar Avisos** — Quantos avisos antes do timeout\n"
             "🚨 **Canal Alertas** — Onde o bot reporta\n"
+            "📢 **Avisar no Canal** — Mensagens de aviso no canal\n"
+            "🗑️ **Deletar Mensagem** — Apaga mensagens proibidas\n"
             "🎖️ **Cargos Isentos** — Quem não leva timeout\n"
             "📵 **Canais Isentos** — Onde o filtro não ativa\n"
             "🔄 **Ligar/Desligar** — Ativa ou desativa o sistema"
         ), inline=False)
-        embed.set_footer(text="🔄 Usa o menu abaixo para voltar ao menu principal")
+        embed.set_footer(text="🔄 Usa o menu abaixo para navegar entre categorias")
         return embed, ViewPalavroes()
 
     elif cat == "embeds":
@@ -793,6 +798,41 @@ class ModalConfigPalavroesTimeout(discord.ui.Modal, title='Configurar Timeout de
         if guild:
             embed, view = build_categoria(guild, "palavroes")
             await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ModalConfigPalavroesAvisos(discord.ui.Modal, title='Configurar Avisos de Palavrões'):
+    avisos = discord.ui.TextInput(label='Número de avisos antes do timeout', placeholder='Ex: 3', default="3", required=True)
+
+    def __init__(self, guild_id, bot):
+        super().__init__()
+        self._guild_id = guild_id
+        self._bot = bot
+
+    async def on_submit(self, interaction):
+        try:
+            d = int(self.avisos.value)
+        except ValueError:
+            return await interaction.response.send_message("❌ Valor inválido! Insere um número.", ephemeral=True)
+        if d < 0 or d > 50:
+            return await interaction.response.send_message("❌ O número de avisos deve ser entre 0 e 50.", ephemeral=True)
+        try:
+            supabase.table("palavroes_config").upsert({
+                "guilda_id": self._guild_id,
+                "avisos_antes_timeout": d,
+                "habilitado": True
+            }).execute()
+        except Exception as e:
+            return await interaction.response.send_message(
+                f"❌ Erro na base de dados.\nDetalhe: {str(e)[:200]}", ephemeral=True
+            )
+        guild = self._bot.get_guild(int(self._guild_id))
+        if guild:
+            embed, view = build_categoria(guild, "palavroes")
+            await interaction.response.edit_message(
+                content=f"✅ **{d}** aviso(s) configurado(s) antes do timeout.",
+                embed=embed,
+                view=view
+            )
 
 
 class SelectCanalAlertasPalavroes(discord.ui.View):
@@ -876,29 +916,67 @@ class ViewPalavroes(discord.ui.View):
     async def btn_config(self, interaction, button):
         await interaction.response.send_modal(ModalConfigPalavroesTimeout(str(interaction.guild_id), interaction.client))
 
-    @discord.ui.button(label="Canal Alertas", style=discord.ButtonStyle.secondary, emoji="🚨", custom_id="palavroes_canal", row=1)
+    @discord.ui.button(label="Configurar Avisos", style=discord.ButtonStyle.primary, emoji="🔢", custom_id="palavroes_avisos", row=1)
+    async def btn_avisos(self, interaction, button):
+        await interaction.response.send_modal(ModalConfigPalavroesAvisos(str(interaction.guild_id), interaction.client))
+
+    @discord.ui.button(label="Avisar no Canal", style=discord.ButtonStyle.secondary, emoji="📢", custom_id="palavroes_aviso", row=1)
+    async def btn_aviso_canal(self, interaction, button):
+        guild_id = str(interaction.guild_id)
+        cfg = ler_sub("palavroes_config", guild_id)
+        atual = cfg.get("aviso_canal", False)
+        try:
+            supabase.table("palavroes_config").upsert({
+                "guilda_id": guild_id,
+                "aviso_canal": not atual,
+                "habilitado": True
+            }).execute()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro na base de dados: {str(e)[:200]}", ephemeral=True)
+            return
+        status = "ativado" if not atual else "desativado"
+        await interaction.response.send_message(f"✅ **Avisar no Canal** {status}.", ephemeral=True)
+
+    @discord.ui.button(label="Deletar MSG", style=discord.ButtonStyle.secondary, emoji="🗑️", custom_id="palavroes_deletar", row=1)
+    async def btn_deletar(self, interaction, button):
+        guild_id = str(interaction.guild_id)
+        cfg = ler_sub("palavroes_config", guild_id)
+        atual = cfg.get("deletar_mensagem", True)
+        try:
+            supabase.table("palavroes_config").upsert({
+                "guilda_id": guild_id,
+                "deletar_mensagem": not atual,
+                "habilitado": True
+            }).execute()
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erro na base de dados: {str(e)[:200]}", ephemeral=True)
+            return
+        status = "ativado" if not atual else "desativado"
+        await interaction.response.send_message(f"✅ **Deletar Mensagem** {status}.", ephemeral=True)
+
+    @discord.ui.button(label="Canal Alertas", style=discord.ButtonStyle.secondary, emoji="🚨", custom_id="palavroes_canal", row=2)
     async def btn_canal(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona o canal de alertas:**", view=SelectCanalAlertasPalavroes(str(interaction.guild_id), interaction.client), ephemeral=True)
 
-    @discord.ui.button(label="Cargos Isentos", style=discord.ButtonStyle.secondary, emoji="🎖️", custom_id="palavroes_cargos", row=1)
+    @discord.ui.button(label="Cargos Isentos", style=discord.ButtonStyle.secondary, emoji="🎖️", custom_id="palavroes_cargos", row=2)
     async def btn_cargos(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona cargos que não recebem timeout:**", view=SelectCargosIsentosPalavroes(str(interaction.guild_id), interaction.client), ephemeral=True)
 
-    @discord.ui.button(label="Canais Isentos", style=discord.ButtonStyle.secondary, emoji="📵", custom_id="palavroes_canais", row=1)
+    @discord.ui.button(label="Canais Isentos", style=discord.ButtonStyle.secondary, emoji="📵", custom_id="palavroes_canais", row=2)
     async def btn_canais(self, interaction, button):
         await interaction.response.send_message("👇 **Seleciona canais onde o filtro não ativa:**", view=SelectCanaisIsentosPalavroes(str(interaction.guild_id), interaction.client), ephemeral=True)
 
-    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="palavroes_toggle", row=2)
+    @discord.ui.button(label="Ligar/Desligar", style=discord.ButtonStyle.success, emoji="🔄", custom_id="palavroes_toggle", row=3)
     async def btn_toggle(self, interaction, button):
         novo = toggle_config("palavroes_config", str(interaction.guild_id))
         status = "ativado" if novo else "desativado"
         await interaction.response.send_message(f"✅ Sistema de palavrões **{status}**.", ephemeral=True)
 
-    @discord.ui.button(label="Adicionar Palavra", style=discord.ButtonStyle.primary, emoji="➕", custom_id="palavroes_add", row=2)
+    @discord.ui.button(label="Adicionar Palavra", style=discord.ButtonStyle.primary, emoji="➕", custom_id="palavroes_add", row=3)
     async def btn_add(self, interaction, button):
         await interaction.response.send_modal(ModalAddPalavra(str(interaction.guild_id), interaction.client))
 
-    @discord.ui.button(label="Listar Palavras", style=discord.ButtonStyle.secondary, emoji="📋", custom_id="palavroes_listar", row=2)
+    @discord.ui.button(label="Listar Palavras", style=discord.ButtonStyle.secondary, emoji="📋", custom_id="palavroes_listar", row=3)
     async def btn_listar(self, interaction, button):
         cfg = ler_sub("palavroes_config", str(interaction.guild_id))
         palavras = cfg.get("palavras_personalizadas", []) or []
@@ -914,8 +992,8 @@ class ViewPalavroes(discord.ui.View):
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-class ModalAddPalavra(discord.ui.Modal, title='Adicionar Palavra de Palavrão'):
-    palavra = discord.ui.TextInput(label='Palavra', placeholder='Ex: palavra_proibida', required=True, max_length=50)
+class ModalAddPalavra(discord.ui.Modal, title='Adicionar Palavras de Palavrão'):
+    palavra = discord.ui.TextInput(label='Palavras', placeholder='Ex: palavra1, palavra2, palavra3', required=True, max_length=500)
 
     def __init__(self, guild_id, bot):
         super().__init__()
@@ -923,29 +1001,52 @@ class ModalAddPalavra(discord.ui.Modal, title='Adicionar Palavra de Palavrão'):
         self._bot = bot
 
     async def on_submit(self, interaction):
-        palavra = self.palavra.value.strip().lower()
-        if len(palavra) < 2:
-            return await interaction.response.send_message("❌ A palavra precisa ter pelo menos 2 caracteres.", ephemeral=True)
+        palavras_input = [p.strip().lower() for p in self.palavra.value.split(",")]
+        palavras_input = [p for p in palavras_input if len(p) >= 2]
+        if not palavras_input:
+            return await interaction.response.send_message("❌ Todas as palavras precisam ter pelo menos 2 caracteres.", ephemeral=True)
+
         cfg = ler_sub("palavroes_config", self._guild_id)
-        palavras = cfg.get("palavras_personalizadas", []) or []
-        if palavra in palavras:
-            return await interaction.response.send_message(f"⚠️ **{palavra}** já está na lista.", ephemeral=True)
-        palavras.append(palavra)
+        palavras_existentes = set(cfg.get("palavras_personalizadas", []) or [])
+
+        novas = [p for p in palavras_input if p not in palavras_existentes]
+        duplicatas = [p for p in palavras_input if p in palavras_existentes]
+
+        if not novas:
+            if duplicatas:
+                lista = ", ".join(f"`{p}`" for p in duplicatas[:10])
+                return await interaction.response.send_message(
+                    f"⚠️ Todas as palavras já estão na lista:\n{lista}", ephemeral=True
+                )
+            return await interaction.response.send_message("❌ Nenhuma palavra válida.", ephemeral=True)
+
+        todas = list(palavras_existentes) + novas
         try:
             supabase.table("palavroes_config").upsert({
                 "guilda_id": self._guild_id,
-                "palavras_personalizadas": palavras,
+                "palavras_personalizadas": todas,
                 "habilitado": True
             }).execute()
         except Exception as e:
             return await interaction.response.send_message(
-                f"❌ Erro na base de dados. A coluna `palavras_personalizadas` pode não existir.\nDetalhe: {str(e)[:200]}",
+                f"❌ Erro na base de dados.\nDetalhe: {str(e)[:200]}",
                 ephemeral=True
             )
         guild = self._bot.get_guild(int(self._guild_id))
         if guild:
             embed, view = build_categoria(guild, "palavroes")
-            await interaction.response.edit_message(embed=embed, view=view)
+            msg = f"✅ **{len(novas)}** palavra(s) adicionada(s)."
+            if duplicatas:
+                msg += f"\n⚠️ Ignoradas (já existiam): {len(duplicatas)}"
+            await interaction.response.edit_message(
+                content=msg,
+                embed=embed,
+                view=view
+            )
+        else:
+            await interaction.response.send_message(
+                f"✅ {len(novas)} palavra(s) adicionada(s).", ephemeral=True
+            )
 
 
 class ViewEmbeds(discord.ui.View):
